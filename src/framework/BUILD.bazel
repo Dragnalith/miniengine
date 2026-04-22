@@ -1,0 +1,33 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "_private_includes",
+    includes = ["src"],
+    visibility = ["//visibility:private"],
+)
+
+cc_library(
+    name = "framework",
+    srcs = glob([
+        "src/private/**/*.cpp",
+        "src/private/**/*.h",
+    ]),
+    hdrs = glob([
+        "include/imgui/*.h",
+        "include/fw/*.h",
+    ]),
+    implementation_deps = [
+        "_private_includes",
+    ],
+    includes = ["include"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/foundation",
+        "@msvc_toolchains//lib:d3d12",
+        "@msvc_toolchains//lib:d3dcompiler",
+        "@msvc_toolchains//lib:dxgi",
+        "@msvc_toolchains//lib:imm32",
+        "@msvc_toolchains//lib:kernel32",
+        "@msvc_toolchains//lib:user32",
+    ],
+)

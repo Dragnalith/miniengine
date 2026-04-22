@@ -1,0 +1,23 @@
+bazel_dep(name = "rules_cc", version = "0.2.17")
+bazel_dep(name = "toolchains_msvc", version = "0.1.0")
+git_override(
+    module_name = "toolchains_msvc",
+    remote = "https://github.com/Dragnalith/toolchains_msvc.git",
+    commit = "e5b8d113480ce43970bdb034c939eb19a721b244",
+)
+
+toolchain = use_extension("@toolchains_msvc//:extensions.bzl", "toolchain")
+toolchain.repo_name(name = "msvc_toolchains")
+toolchain.toolchain_set(
+    name = "default",
+    hosts = ["x64"],
+    targets = ["x64"],
+    msvc_versions = ["14.44"],
+    winsdk_versions = ["26100"],
+    cl_with_lld_version = "22.1.1",
+    features = ["cxx_standard_20", "generate_debug_symbols"],
+    add_cl_copt = ["/DNOMINMAX"],
+)
+use_repo(toolchain, "msvc_toolchains")
+
+register_toolchains("@msvc_toolchains//:all")

@@ -1,0 +1,19 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary")
+
+cc_binary(
+    name = "app",
+    srcs = glob([
+        "src/**/*.cpp",
+        "include/app/*.h",
+    ]),
+    includes = ["include"],
+    deps = [
+        "//src/foundation",
+        "//src/framework",
+        "@msvc_toolchains//lib:d3d12",
+        "@msvc_toolchains//lib:d3dcompiler",
+        "@msvc_toolchains//lib:dxgi",
+        "@msvc_toolchains//lib:kernel32",
+        "@msvc_toolchains//lib:user32",
+    ],
+)

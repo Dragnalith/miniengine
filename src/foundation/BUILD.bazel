@@ -1,0 +1,25 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "_private_includes",
+    includes = ["src"],
+    visibility = ["//visibility:private"],
+)
+
+cc_library(
+    name = "foundation",
+    srcs = glob([
+        "src/private/**/*.cpp",
+        "src/private/**/*.h",
+    ]),
+    hdrs = glob(["include/fnd/*.h"]),
+    implementation_deps = [
+        "_private_includes",
+    ],
+    strip_include_prefix = "include",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@msvc_toolchains//lib:kernel32",
+        "@msvc_toolchains//lib:user32",
+    ],
+)
