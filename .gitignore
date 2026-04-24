@@ -1,3 +1,5 @@
 bazel-*
 MODULE.bazel.lock
 imgui.ini
+user.bazelrc
+.mado
