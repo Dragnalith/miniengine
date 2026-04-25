@@ -1,13 +1,13 @@
 #pragma once
 
-#include <fnd/Util.h>
+#include <fnd/Pimpl.h>
 #include <fnd/Window.h>
 #include <fw/FrameData.h>
 
 struct ID3D12GraphicsCommandList;
 struct ImDrawData;
 
-namespace engine
+namespace migi
 {
 
 class RenderDevice;

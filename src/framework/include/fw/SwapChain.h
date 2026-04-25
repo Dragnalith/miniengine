@@ -1,15 +1,14 @@
 #pragma once
 
-#include <fnd/Util.h>
+#include <fnd/Pimpl.h>
 
-#include <windows.h>
 #include <stdint.h>
 
 struct IDXGISwapChain3;
 struct ID3D12Resource;
 struct D3D12_CPU_DESCRIPTOR_HANDLE;
 
-namespace engine
+namespace migi
 {
 
 class RenderDevice;
@@ -34,7 +33,7 @@ public:
     uint32_t GetCurrentIndex() const;
     ID3D12Resource* GetResource(int64_t index) const;
     const D3D12_CPU_DESCRIPTOR_HANDLE& GetRenderTargetDescriptor(int64_t) const;
-    HANDLE GetWaitableObject() const;
+    void* GetWaitableObject() const;
 
     void Present(uint32_t syncInterval) const;
     bool NeedResize(int width, int height, bool fullscreen) const;

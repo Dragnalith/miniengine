@@ -1,5 +1,6 @@
 #include <fw/SwapChain.h>
 
+#include <fnd/Assert.h>
 #include <fw/RenderDevice.h>
 #include <fnd/Window.h>
 
@@ -9,7 +10,7 @@
 #include <iostream>
 static constexpr int NUM_BACK_BUFFERS = 2;
 
-namespace engine
+namespace migi
 {
 
 struct SwapChainImpl
@@ -45,7 +46,9 @@ struct SwapChainImpl
 SwapChain::SwapChain(RenderDevice& device)
     : m_impl(device)
 {
-    Window::GetMainWindow().GetSize(&m_impl->width, &m_impl->height);
+    Int2 windowSize = WindowGetSize();
+    m_impl->width = windowSize.x;
+    m_impl->height = windowSize.y;
     HRESULT result = S_OK;
 
     {
@@ -55,7 +58,7 @@ SwapChain::SwapChain(RenderDevice& device)
         desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
         desc.NodeMask = 1;
         result = device.GetDevice()->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_impl->descriptorHeap));
-        ASSERT_MSG(result == S_OK, "SwapChain descriptor heap failed");
+        MIGI_ASSERT(result == S_OK, "SwapChain descriptor heap failed");
 
         SIZE_T rtvDescriptorSize = device.GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
         D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_impl->descriptorHeap->GetCPUDescriptorHandleForHeapStart();
@@ -89,14 +92,15 @@ SwapChain::SwapChain(RenderDevice& device)
         IDXGISwapChain1* swapChain1 = NULL;
         
         result = CreateDXGIFactory1(IID_PPV_ARGS(&dxgiFactory));
-        ASSERT_MSG(result == S_OK, "DXGI Factory creation failed");
+        MIGI_ASSERT(result == S_OK, "DXGI Factory creation failed");
 
-        result = dxgiFactory->CreateSwapChainForHwnd(device.GetCommandQueue(), Window::GetMainWindow().GetHandle(), &sd, NULL, NULL, &swapChain1);
-        ASSERT_MSG(result == S_OK, "CreateSwapChainForHwnd failed");
+        HWND hwnd = static_cast<HWND>(WindowGetNativeHandle());
+        result = dxgiFactory->CreateSwapChainForHwnd(device.GetCommandQueue(), hwnd, &sd, NULL, NULL, &swapChain1);
+        MIGI_ASSERT(result == S_OK, "CreateSwapChainForHwnd failed");
         result = swapChain1->QueryInterface(IID_PPV_ARGS(&m_impl->swapChain));
-        ASSERT_MSG(result == S_OK, "SwapChain QueryInterface failed");
-        result = dxgiFactory->MakeWindowAssociation(Window::GetMainWindow().GetHandle(), DXGI_MWA_NO_WINDOW_CHANGES);
-        ASSERT_MSG(result == S_OK, "Failed to make swapchain window assocation");
+        MIGI_ASSERT(result == S_OK, "SwapChain QueryInterface failed");
+        result = dxgiFactory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_WINDOW_CHANGES);
+        MIGI_ASSERT(result == S_OK, "Failed to make swapchain window assocation");
 
         swapChain1->Release();
         dxgiFactory->Release();
@@ -134,13 +138,13 @@ const D3D12_CPU_DESCRIPTOR_HANDLE& SwapChain::GetRenderTargetDescriptor(int64_t 
     return m_impl->mainRenderTargetDescriptor[index % NUM_BACK_BUFFERS];
 }
 
-HANDLE SwapChain::GetWaitableObject() const {
+void* SwapChain::GetWaitableObject() const {
     return m_impl->waitableObject;
 }
 
 void SwapChain::Present(uint32_t syncInterval) const {
     HRESULT result = m_impl->swapChain->Present(syncInterval, 0);
-    ASSERT_MSG(result == S_OK, "Swapchain present has failed");
+    MIGI_ASSERT(result == S_OK, "Swapchain present has failed");
 }
 
 bool SwapChain::NeedResize(int width, int height, bool fullscreen) const {
@@ -153,7 +157,7 @@ void SwapChain::Resize(int width, int height, bool fullscreen) {
         m_impl->swapChain->SetFullscreenState(fullscreen, nullptr);
     }
     HRESULT result = m_impl->swapChain->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT);
-    ASSERT_MSG(result == S_OK, "Failed to resize swapchain.");
+    MIGI_ASSERT(result == S_OK, "Failed to resize swapchain.");
     m_impl->CreateRenderTarget();
     m_impl->width = width;
     m_impl->height = height;

@@ -1,0 +1,1 @@
+- [ ] Support Hidpi screen on Windows

@@ -1,11 +1,12 @@
 #pragma once
 
-#include <fnd/Util.h>
+#include <fnd/Input.h>
+#include <fnd/Pimpl.h>
+#include <fnd/Window.h>
 
-namespace engine
+namespace migi
 {
 
-class Window;
 struct WindowManagerImpl;
 
 class WindowManager
@@ -13,12 +14,24 @@ class WindowManager
 public:
     WindowManager();
     ~WindowManager();
-    Window& Create(const char* name);
-    void Destroy(Window& window);
-    void SetCursor(void* cursor);
+
+    void CreateMainWindow(const char* name);
+    void DestroyMainWindow();
+
+    Int2 GetSize() const;
+    uint64_t GetLastClosePressEventIndex() const;
+
+    uint32_t GetMouseState(uint64_t lastStateIndex, MouseState* states, uint32_t maxStateCount) const;
+    uint32_t GetKeyboardState(uint64_t lastStateIndex, KeyboardState* states, uint32_t maxStateCount) const;
+    uint64_t ReadTextStream(uint64_t firstIndex, wchar_t* characters, uint32_t maxCharacterCount) const;
+
+    void SetCursorShape(CursorShape shape);
+    void* GetNativeHandle() const;
 
 private:
     Pimpl<WindowManagerImpl> m_impl;
 };
+
+void SetActiveWindowManager(WindowManager* manager);
 
 }

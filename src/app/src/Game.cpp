@@ -8,7 +8,7 @@
 #include <fnd/Profiler.h>
 
 
-namespace engine
+namespace migi
 {
 struct FrameData;
 }
@@ -26,37 +26,37 @@ const char* g_frame_strategy[4]{
 }
 
 Game::Game() {
-    m_lastQuitTime = engine::Window::GetMainWindow().GetLastQuitTime();
+    m_lastClosePressEventIndex = migi::WindowGetLastClosePressEventIndex();
 }
 
 // Create some 
 void UpdateSubPosition(int i) {
     PROFILE_SCOPE("UpdateSubPosition");
 
-    engine::RandomWorkload(i * 50);
+    migi::RandomWorkload(i * 50);
 }
 void UpdatePosition(int i) {
     UpdateSubPosition(i);
-    engine::RandomWorkload(500);
+    migi::RandomWorkload(500);
     UpdateSubPosition(2 * i);
 }
 
-void Game::Update(engine::FrameData& frameData) 
+void Game::Update(migi::FrameData& frameData) 
 {
-    engine::Time startTime = engine::Clock::now();
+    migi::TimePoint startTime = migi::TimePoint::Now();
 
     {
         PROFILE_SCOPE("Game Jobs");
 
-        engine::JobCounter handle;
+        migi::JobCounter handle;
         for (int i = 0; i < frameData.gamejobNumber; i++) {
-            engine::Job::Dispatch("UpdatePosition Job", handle, [i] {
+            migi::Job::Dispatch("UpdatePosition Job", handle, [i] {
                 UpdatePosition(i);
             });
         }
-        engine::Job::Wait(handle);
+        migi::Job::Wait(handle);
     }
-    frameData.result.stop = m_lastQuitTime != engine::Window::GetMainWindow().GetLastQuitTime();
+    frameData.result.stop = m_lastClosePressEventIndex != migi::WindowGetLastClosePressEventIndex();
     // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
     if (m_show_demo_window)
         ImGui::ShowDemoWindow(&m_show_demo_window);
@@ -99,18 +99,18 @@ void Game::Update(engine::FrameData& frameData)
             switch (m_selectedStrategy) {
             case 0: // 3 Frame Latency
                 frameData.result.maxFrameLatency = 3;
-                frameData.result.gameStageUs = engine::FrameUpdateResult::DefaultGameStageUs;
-                frameData.result.renderStageUs = engine::FrameUpdateResult::DefaultRenderStageUs;
+                frameData.result.gameStageUs = migi::FrameUpdateResult::DefaultGameStageUs;
+                frameData.result.renderStageUs = migi::FrameUpdateResult::DefaultRenderStageUs;
                 break;
             case 1: // 2 Frame Latency (CPU bound)
                 frameData.result.maxFrameLatency = 2;
-                frameData.result.gameStageUs = engine::FrameUpdateResult::DefaultGameStageUs;
+                frameData.result.gameStageUs = migi::FrameUpdateResult::DefaultGameStageUs;
                 frameData.result.renderStageUs = 8000;
                 break;
             case 2: // 2 Frame Latency (GPU bound)
                 frameData.result.maxFrameLatency = 2;
                 frameData.result.gameStageUs = 8000;
-                frameData.result.renderStageUs = engine::FrameUpdateResult::DefaultRenderStageUs;
+                frameData.result.renderStageUs = migi::FrameUpdateResult::DefaultRenderStageUs;
                 break;
             case 3: // 1 Frame Latency
                 frameData.result.maxFrameLatency = 1;
@@ -136,9 +136,9 @@ void Game::Update(engine::FrameData& frameData)
     frameData.vsync = m_vsync;
 
     {
-        engine::Time beforeWorkloadTime = engine::Clock::now();
+        migi::TimePoint beforeWorkloadTime = migi::TimePoint::Now();
         PROFILE_SCOPE("Game Workload");
-        engine::RandomWorkload(frameData.gameStageUs - engine::to_us(beforeWorkloadTime - startTime)); // random workload of 5ms to be visible on profiler
+        migi::RandomWorkload(frameData.gameStageUs - static_cast<int>((beforeWorkloadTime - startTime).ToMicroseconds())); // random workload of 5ms to be visible on profiler
     }
 }
 

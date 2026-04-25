@@ -1,5 +1,6 @@
 #include <fnd/Util.h>
 #include <fnd/Job.h>
+#include <fnd/TaskQueue.h>
 
 #include <fw/Renderer.h>
 #include <fw/RenderDevice.h>
@@ -15,7 +16,7 @@
 
 #include <fnd/Profiler.h>
 
-namespace engine 
+namespace migi 
 {
 
 struct RenderContextManaged : public RenderContext
@@ -83,7 +84,7 @@ struct RendererImpl {
 
     RenderContext* Allocate(uint64_t frameIndex) {
         RenderContextManaged* frameCtx = &frameContext[frameIndex % RendererImpl::NUM_FRAMES_IN_FLIGHT];
-        ASSERT_MSG(frameCtx->isUsed == false, "RenderContext is already used");
+        MIGI_ASSERT(frameCtx->isUsed == false, "RenderContext is already used");
         frameCtx->isUsed = true;
         frameCtx->frameIndex = frameIndex;
         return frameCtx;
@@ -92,7 +93,7 @@ struct RendererImpl {
     void Free(RenderContext* ctx) {
         for (int i = 0; i < RendererImpl::NUM_FRAMES_IN_FLIGHT; i++) {
             if (ctx == &frameContext[i]) {
-                ASSERT_MSG(ctx->frameIndex == frameContext[i].frameIndex, "RenderContext free issue");
+                MIGI_ASSERT(ctx->frameIndex == frameContext[i].frameIndex, "RenderContext free issue");
                 frameContext[i].isUsed = false;
                 frameContext[i].frameIndex = -1;
             }
@@ -107,19 +108,19 @@ Renderer::Renderer(RenderDevice& device, SwapChain& sc, DearImGuiManager& manage
     for (uint32_t i = 0; i < RendererImpl::NUM_FRAMES_IN_FLIGHT; i++) {
         m_impl->frameContext[i].index = i;
         result = m_impl->renderDevice.GetDevice()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_impl->frameContext[i].CommandAllocator));
-        ASSERT_MSG(result == S_OK, "Command Allocator Creation Failed");
+        MIGI_ASSERT(result == S_OK, "Command Allocator Creation Failed");
         result = m_impl->renderDevice.GetDevice()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_impl->frameContext[0].CommandAllocator, NULL, IID_PPV_ARGS(&m_impl->frameContext[i].commandList));
-        ASSERT_MSG(result == S_OK, "CommandList creation has failed");
+        MIGI_ASSERT(result == S_OK, "CommandList creation has failed");
         result = m_impl->frameContext[i].commandList->Close();
-        ASSERT_MSG(result == S_OK, "Command List is closed");
+        MIGI_ASSERT(result == S_OK, "Command List is closed");
     }
 
 
     result = m_impl->renderDevice.GetDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_impl->gpuCompletionfence));
-    ASSERT_MSG(result == S_OK, "Fence creation has failed");
+    MIGI_ASSERT(result == S_OK, "Fence creation has failed");
 
     m_impl->gpuCompletionfenceEvent = ::CreateEvent(NULL, FALSE, FALSE, NULL);
-    ASSERT_MSG(m_impl->gpuCompletionfenceEvent != nullptr, "Fence Event creation has failed");
+    MIGI_ASSERT(m_impl->gpuCompletionfenceEvent != nullptr, "Fence Event creation has failed");
 }
 
 Renderer::~Renderer()
@@ -138,21 +139,21 @@ Renderer::~Renderer()
 void RenderOneObject(int i) {
     PROFILE_SCOPE("RenderOneObject");
 
-    engine::RandomWorkload(150, (i * 10) % 80);
+    migi::RandomWorkload(150, (i * 10) % 80);
 }
 void RenderMultipleObject(int N) {
     PROFILE_SCOPE("RenderMultipleObject");
 
-    engine::RandomWorkload(200);
+    migi::RandomWorkload(200);
     for (int i = 0; i < N; i++) {
         RenderOneObject(100);
     }
-    engine::RandomWorkload(100);
+    migi::RandomWorkload(100);
 }
 
 void Renderer::Render(FrameData& frameData) {
 
-    engine::Time startTime = engine::Clock::now();
+    migi::TimePoint startTime = migi::TimePoint::Now();
 
     if (m_impl->swapChain.NeedResize(frameData.width, frameData.height, frameData.fullscreen))
     {
@@ -192,19 +193,19 @@ void Renderer::Render(FrameData& frameData) {
 
     {
         PROFILE_SCOPE("Renderer Jobs");
-        engine::JobCounter handle;
+        migi::JobCounter handle;
         for (int i = 0; i < frameData.rendererjobNumber; i++) {
-            engine::Job::Dispatch("RenderObject Job", handle, [i] {
+            migi::Job::Dispatch("RenderObject Job", handle, [i] {
                 RenderMultipleObject(i % 3);
             });
         }
-        engine::Job::Wait(handle);
+        migi::Job::Wait(handle);
     }
 
     {
-        engine::Time beforeWorkloadTime = engine::Clock::now();
+        migi::TimePoint beforeWorkloadTime = migi::TimePoint::Now();
         PROFILE_SCOPE("Renderer Workload");
-        RandomWorkload(frameData.renderStageUs - engine::to_us(beforeWorkloadTime - startTime)); // random workload of 5ms to be visible on profiler
+        RandomWorkload(frameData.renderStageUs - static_cast<int>((beforeWorkloadTime - startTime).ToMicroseconds())); // random workload of 5ms to be visible on profiler
     }
 
 }

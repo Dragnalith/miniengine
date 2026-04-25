@@ -1,11 +1,10 @@
 #pragma once
 
-#include <windows.h>
-
 namespace fnd
 {
 	bool IsProfilingEnabled();
 	void SetThreadName(const char* name);
+	void SwitchFiber(void* fiber, const char* name);
 }
 
 #define PROFILE_SET_THREADNAME(name)
@@ -19,4 +18,4 @@ namespace fnd
 
 #define PROFILE_REGISTER_FIBER(Fiber, Name)
 #define PROFILE_UNREGISTER_FIBER(Fiber, Name)
-#define SWITCH_TO_FIBER(Fiber, Name) ::SwitchToFiber((Fiber));
+#define SWITCH_TO_FIBER(Fiber, Name) fnd::SwitchFiber((Fiber), (Name));

@@ -1,5 +1,6 @@
 #include <fw/DefaultFramePipeline.h>
 
+#include <fnd/Util.h>
 #include <fnd/Window.h>
 #include <fw/IFramePipeline.h>
 #include <fw/DearImGuiManager.h>
@@ -8,12 +9,12 @@
 
 #include <imgui/imgui.h>
 
-namespace engine
+namespace migi
 {
 
 namespace {
 
-void CopyImDrawData(const ImDrawData* fromData, engine::FrameData* frameData) {
+void CopyImDrawData(const ImDrawData* fromData, migi::FrameData* frameData) {
     frameData->drawData.Valid = fromData->Valid;
     frameData->drawData.CmdListsCount = fromData->CmdListsCount;
     frameData->drawData.TotalIdxCount = fromData->TotalIdxCount;
@@ -26,16 +27,16 @@ void CopyImDrawData(const ImDrawData* fromData, engine::FrameData* frameData) {
         frameData->drawData.DrawLists.emplace_back();
 
         ImDrawList& fromList = *fromData->CmdLists[i];
-        engine::DrawList& toList = frameData->drawData.DrawLists.back();
+        migi::DrawList& toList = frameData->drawData.DrawLists.back();
         toList.Flags = fromList.Flags;
         toList.CmdBuffer = fromList.CmdBuffer;
         toList.IdxBuffer = fromList.IdxBuffer;
         toList.VtxBuffer = fromList.VtxBuffer;
-        ASSERT_MSG(toList.CmdBuffer.size() == fromList.CmdBuffer.size(), "ImGUI cmdbuffer data copy failed");
-        ASSERT_MSG(toList.IdxBuffer.size() == fromList.IdxBuffer.size(), "ImGUI idxbuffer data copy failed");
-        ASSERT_MSG(toList.VtxBuffer.size() == fromList.VtxBuffer.size(), "ImGUI vtxbuffer data copy failed");
+        MIGI_ASSERT(toList.CmdBuffer.size() == fromList.CmdBuffer.size(), "ImGUI cmdbuffer data copy failed");
+        MIGI_ASSERT(toList.IdxBuffer.size() == fromList.IdxBuffer.size(), "ImGUI idxbuffer data copy failed");
+        MIGI_ASSERT(toList.VtxBuffer.size() == fromList.VtxBuffer.size(), "ImGUI vtxbuffer data copy failed");
     }
-    ASSERT_MSG(frameData->drawData.DrawLists.size() == frameData->drawData.CmdListsCount, "ImGUI data copy failed");
+    MIGI_ASSERT(frameData->drawData.DrawLists.size() == frameData->drawData.CmdListsCount, "ImGUI data copy failed");
 }
 
 }
@@ -50,12 +51,9 @@ DefaultFramePipeline::DefaultFramePipeline(DearImGuiManager& imguiManager, Rende
 }
 void DefaultFramePipeline::Update(FrameData& frameData) {
     // UPDATE
-    Window::GetMainWindow().GetSize(&frameData.width, &frameData.height);
-
-    // Update ImGUI
-    for (auto& msg : Window::GetMainWindow().PopMsg()) {
-        m_imguiManager.WndProcHandler(msg.hWnd, msg.msg, msg.wParam, msg.lParam);
-    }
+    Int2 windowSize = WindowGetSize();
+    frameData.width = windowSize.x;
+    frameData.height = windowSize.y;
 
     // Start the Dear ImGui frame
     m_imguiManager.Update(frameData.deltatime);
@@ -79,4 +77,4 @@ void DefaultFramePipeline::Clean(const FrameData& frameData) {
     m_renderer.Clean(frameData);
     RandomWorkload(1000);
 }
-} // namespace engine
+} // namespace migi

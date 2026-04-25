@@ -7,6 +7,14 @@
 - `framework`: defines the frame concept; owns the frame manager; schedules update and rendering work; contains reusable engine systems such as the renderer.
 - `app`: defines application behavior.
 
+## State Boundaries
+
+- Global mutable state is not authorized in miniengine modules.
+- `foundation` is the only exception: it may own process-wide platform state needed to implement windowing, input, threading, synchronization, and other platform services.
+- Foundation state is internally mutable but externally read-only. Public foundation APIs must be observational queries: calling them must not update, advance, drain, or consume state.
+- Repeated immediate reads, such as two consecutive `GetState()` calls with no intervening platform progress, should return the same data.
+- Other modules receive state through explicit ownership, references, handles, or read-only foundation queries.
+
 ## Headers
 
 - Each module separates public headers from private headers.

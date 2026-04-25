@@ -15,7 +15,7 @@
 #pragma comment(lib, "dxguid.lib")
 #endif
 
-namespace engine
+namespace migi
 {
 
 RenderDevice::RenderDevice()
@@ -32,7 +32,7 @@ RenderDevice::RenderDevice()
     {
         D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_0;
         result = D3D12CreateDevice(NULL, featureLevel, IID_PPV_ARGS(&m_pd3dDevice));
-        ASSERT_MSG(result == S_OK, "D3D Device Creation failed");
+        MIGI_ASSERT(result == S_OK, "D3D Device Creation failed");
     }
 
     // D3D Command Queue
@@ -42,7 +42,7 @@ RenderDevice::RenderDevice()
         desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
         desc.NodeMask = 1;
         result = m_pd3dDevice->CreateCommandQueue(&desc, IID_PPV_ARGS(&m_pd3dCommandQueue));
-        ASSERT_MSG(result == S_OK, "D3D Command Queue Creation failed");
+        MIGI_ASSERT(result == S_OK, "D3D Command Queue Creation failed");
 
     }
 

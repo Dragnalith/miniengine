@@ -8,7 +8,7 @@
 struct ID3D12CommandAllocator;
 struct ID3D12GraphicsCommandList;
 
-namespace engine
+namespace migi
 {
 
 // This data is read of the FrameManager to change its behavior

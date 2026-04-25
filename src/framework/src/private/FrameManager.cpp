@@ -1,5 +1,6 @@
 #pragma once
 
+#include <fnd/Assert.h>
 #include <fnd/Job.h>
 #include <fw/FrameManager.h>
 
@@ -9,13 +10,13 @@
 #include <mutex>
 #include <format>
 
-namespace engine
+namespace migi
 {
 
 
 FrameManager::FrameManager(IFramePipeline& pipeline)
     : m_pipeline(pipeline)
-    , m_lastStartFrameTime(engine::Clock::now() - std::chrono::milliseconds(16))
+    , m_lastStartFrameTime(TimePoint::Now() - TimeSpan::FromMilliseconds(16))
 {
 }
 
@@ -36,7 +37,7 @@ void FrameManager::SetFrameLatency(int maxFrameLatency)
         m_startSemaphore.Acquire();
         m_maxFrameLatency -= 1;
     }
-    ASSERT_MSG(maxFrameLatency == m_maxFrameLatency, "error in SetFrameLatency");
+    MIGI_ASSERT(maxFrameLatency == m_maxFrameLatency, "error in SetFrameLatency");
 }
 
 int64_t FrameManager::AllocateFrameIndex() {
@@ -53,8 +54,8 @@ void FrameManager::RunFrame(FrameUpdateResult prevResult) {
 
     m_startSemaphore.Acquire();
 
-    auto now = Clock::now();
-    float deltatime = std::chrono::duration<float>(now - m_lastStartFrameTime).count();
+    TimePoint now = TimePoint::Now();
+    float deltatime = static_cast<float>((now - m_lastStartFrameTime).ToSeconds());
     m_lastStartFrameTime = now;
 
     FrameData frameData;
@@ -101,4 +102,4 @@ void FrameManager::StartFrame(FrameUpdateResult result) {
     });
 }
 
-} // namespace engine
+} // namespace migi

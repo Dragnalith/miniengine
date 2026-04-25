@@ -1,6 +1,6 @@
 #pragma once
 
-namespace engine
+namespace migi
 {
 
 /* 
@@ -17,4 +17,4 @@ public:
     virtual void Update(FrameData& frameData) = 0;
 };
 
-} // namespace engine
+} // namespace migi

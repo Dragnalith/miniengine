@@ -2,7 +2,7 @@
 
 #include <fw/IFramePipeline.h>
 
-namespace engine
+namespace migi
 {
 
 class IGame;
@@ -29,4 +29,4 @@ private:
     IGame& m_game;
 };
 
-} // namespace engine
+} // namespace migi

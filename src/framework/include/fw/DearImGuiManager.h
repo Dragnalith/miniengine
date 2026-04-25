@@ -1,11 +1,10 @@
 #pragma once
 
-#include <windows.h>
-
+#include <fnd/Input.h>
 #include <fnd/Window.h>
 #include <imgui/imgui.h>
 
-namespace engine
+namespace migi
 {
 class DearImGuiManager
 {
@@ -14,10 +13,11 @@ public:
 	~DearImGuiManager();
 
 	void Update(float delattime);
-	LRESULT WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 protected:
 	ImGuiMouseCursor m_lastMouseCursor = ImGuiMouseCursor_COUNT;
+	MouseState m_lastMouseState = {};
+	uint64_t m_nextTextInputIndex = 0;
 };
 
 }

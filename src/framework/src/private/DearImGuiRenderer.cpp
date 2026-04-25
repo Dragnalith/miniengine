@@ -1,6 +1,8 @@
 #include <private/DearImGuiRenderer.h>
 #include <fw/RenderDevice.h>
 
+#include <fnd/Assert.h>
+
 // dear imgui: Renderer Backend for DirectX12
 // This needs to be used along with a Platform Backend (e.g. Win32)
 
@@ -57,7 +59,7 @@ bool     ImGui_ImplDX12_Init(ID3D12Device* device, int num_frames_in_flight, DXG
     D3D12_CPU_DESCRIPTOR_HANDLE font_srv_cpu_desc_handle, D3D12_GPU_DESCRIPTOR_HANDLE font_srv_gpu_desc_handle);
 void     ImGui_ImplDX12_Shutdown();
 void     ImGui_ImplDX12_NewFrame();
-void     ImGui_ImplDX12_RenderDrawData(const engine::DrawData* draw_data, ID3D12GraphicsCommandList* graphics_command_list);
+void     ImGui_ImplDX12_RenderDrawData(const migi::DrawData* draw_data, ID3D12GraphicsCommandList* graphics_command_list);
 
 // Use if you want to reset your rendering device without losing Dear ImGui state.
 void     ImGui_ImplDX12_InvalidateDeviceObjects();
@@ -102,7 +104,7 @@ static ImGui_ImplDX12_Data* ImGui_ImplDX12_GetBackendData()
 }
 
 // Functions
-static void ImGui_ImplDX12_SetupRenderState(const engine::DrawData* draw_data, ID3D12GraphicsCommandList* ctx, ImGui_ImplDX12_RenderBuffers* fr)
+static void ImGui_ImplDX12_SetupRenderState(const migi::DrawData* draw_data, ID3D12GraphicsCommandList* ctx, ImGui_ImplDX12_RenderBuffers* fr)
 {
     ImGui_ImplDX12_Data* bd = ImGui_ImplDX12_GetBackendData();
 
@@ -168,7 +170,7 @@ static inline void SafeRelease(T*& res)
 }
 
 // Render function
-void ImGui_ImplDX12_RenderDrawData(const engine::DrawData* draw_data, ID3D12GraphicsCommandList* ctx)
+void ImGui_ImplDX12_RenderDrawData(const migi::DrawData* draw_data, ID3D12GraphicsCommandList* ctx)
 {
     // Avoid rendering when minimized
     if (draw_data->DisplaySize.x <= 0.0f || draw_data->DisplaySize.y <= 0.0f)
@@ -240,7 +242,7 @@ void ImGui_ImplDX12_RenderDrawData(const engine::DrawData* draw_data, ID3D12Grap
     ImDrawIdx* idx_dst = (ImDrawIdx*)idx_resource;
     for (int n = 0; n < draw_data->CmdListsCount; n++)
     {
-        const engine::DrawList* cmd_list = &draw_data->DrawLists[n];
+        const migi::DrawList* cmd_list = &draw_data->DrawLists[n];
         memcpy(vtx_dst, cmd_list->VtxBuffer.Data, cmd_list->VtxBuffer.Size * sizeof(ImDrawVert));
         memcpy(idx_dst, cmd_list->IdxBuffer.Data, cmd_list->IdxBuffer.Size * sizeof(ImDrawIdx));
         vtx_dst += cmd_list->VtxBuffer.Size;
@@ -259,11 +261,11 @@ void ImGui_ImplDX12_RenderDrawData(const engine::DrawData* draw_data, ID3D12Grap
     ImVec2 clip_off = draw_data->DisplayPos;
     for (int n = 0; n < draw_data->CmdListsCount; n++)
     {
-        const engine::DrawList* cmd_list = &draw_data->DrawLists[n];
+        const migi::DrawList* cmd_list = &draw_data->DrawLists[n];
         for (int cmd_i = 0; cmd_i < cmd_list->CmdBuffer.Size; cmd_i++)
         {
             const ImDrawCmd* pcmd = &cmd_list->CmdBuffer[cmd_i];
-            ASSERT_MSG(pcmd->UserCallback == nullptr, "We do not support imgui user callback");
+            MIGI_ASSERT(pcmd->UserCallback == nullptr, "We do not support imgui user callback");
             if (pcmd->UserCallback != NULL)
             {
 #if 0
@@ -757,7 +759,7 @@ void ImGui_ImplDX12_Shutdown()
 
 }
 
-namespace engine
+namespace migi
 {
 
 struct DearImGuiRendererImpl {
@@ -777,7 +779,7 @@ DearImGuiRenderer::DearImGuiRenderer(RenderDevice& device, DearImGuiManager&)
         desc.NumDescriptors = 1;
         desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
         result = m_impl->renderDevice.GetDevice()->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_impl->descriptorHeap));
-        ASSERT_MSG(result == S_OK, "Cannot create descriptor heap for DearImGuiRenderer");
+        MIGI_ASSERT(result == S_OK, "Cannot create descriptor heap for DearImGuiRenderer");
     }
 
     ImGui_ImplDX12_Init(m_impl->renderDevice.GetDevice(), NUM_FRAMES_IN_FLIGHT,

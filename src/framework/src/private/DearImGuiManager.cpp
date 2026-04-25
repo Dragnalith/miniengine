@@ -1,39 +1,58 @@
 #include <fw/DearImGuiManager.h>
 
+#include <fnd/Util.h>
+#include <fnd/Window.h>
 #include <imgui/imgui.h>
 
-#include <windows.h>
-#include <windowsx.h> // GET_X_LPARAM(), GET_Y_LPARAM()
+#include <algorithm>
+#include <array>
+#include <cfloat>
 
-
-#include <fnd/Util.h>
-
-namespace engine
+namespace migi
 {
+
+namespace
+{
+constexpr float kMouseWheelUnit = 120.0f;
+
+CursorShape ToCursorShape(ImGuiMouseCursor cursor)
+{
+    switch (cursor)
+    {
+    case ImGuiMouseCursor_None:       return CursorShape::None;
+    case ImGuiMouseCursor_Arrow:      return CursorShape::Arrow;
+    case ImGuiMouseCursor_TextInput:  return CursorShape::TextInput;
+    case ImGuiMouseCursor_ResizeAll:  return CursorShape::ResizeAll;
+    case ImGuiMouseCursor_ResizeEW:   return CursorShape::ResizeEW;
+    case ImGuiMouseCursor_ResizeNS:   return CursorShape::ResizeNS;
+    case ImGuiMouseCursor_ResizeNESW: return CursorShape::ResizeNESW;
+    case ImGuiMouseCursor_ResizeNWSE: return CursorShape::ResizeNWSE;
+    case ImGuiMouseCursor_Hand:       return CursorShape::Hand;
+    case ImGuiMouseCursor_NotAllowed: return CursorShape::NotAllowed;
+    default:                          return CursorShape::Arrow;
+    }
+}
+}
 
 DearImGuiManager::DearImGuiManager()
 {
-    // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
-    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+    ImGuiIO& io = ImGui::GetIO();
 
-    // Setup Dear ImGui style
     ImGui::StyleColorsDark();
-    //ImGui::StyleColorsLight();
 
-    IM_ASSERT(io.BackendPlatformUserData == NULL && "Already initialized a platform backend!");
+    IM_ASSERT(io.BackendPlatformUserData == NULL && "Already initialized a renderer backend!");
 
-    // Setup backend capabilities flags
     io.BackendPlatformUserData = nullptr;
-    io.BackendPlatformName = "imgui_impl_win32";
-    io.BackendFlags |= ImGuiBackendFlags_HasMouseCursors;         // We can honor GetMouseCursor() values (optional)
-    io.BackendFlags |= ImGuiBackendFlags_HasSetMousePos;          // We can honor io.WantSetMousePos requests (optional, rarely used)
+    io.BackendPlatformName = "imgui_impl_drgn_foundation";
+    io.BackendFlags |= ImGuiBackendFlags_HasMouseCursors;
+
+    m_nextTextInputIndex = 0;
 }
 
-DearImGuiManager::~DearImGuiManager() {
+DearImGuiManager::~DearImGuiManager()
+{
     ImGuiIO& io = ImGui::GetIO();
 
     io.BackendPlatformName = NULL;
@@ -42,180 +61,80 @@ DearImGuiManager::~DearImGuiManager() {
     ImGui::DestroyContext();
 }
 
-void DearImGuiManager::Update(float deltatime) {
+void DearImGuiManager::Update(float deltatime)
+{
     ImGuiIO& io = ImGui::GetIO();
 
-    // Setup display size (every frame to accommodate for window resizing)
-    RECT rect = { 0, 0, 0, 0 };
-    ::GetClientRect(Window::GetMainWindow().GetHandle(), &rect);
-    io.DisplaySize = ImVec2((float)(rect.right - rect.left), (float)(rect.bottom - rect.top));
+    Int2 windowSize = WindowGetSize();
+    io.DisplaySize = ImVec2(static_cast<float>(windowSize.x), static_cast<float>(windowSize.y));
+    io.DeltaTime = deltatime > 0.0f ? deltatime : (1.0f / 60.0f);
 
-    // Setup time step
-    INT64 current_time = 0;
-    ::QueryPerformanceCounter((LARGE_INTEGER*)&current_time);
-    io.DeltaTime = deltatime;
+    std::array<MouseState, kDefaultInputStateReadCount> mouseStates{};
+    const uint32_t mouseStateCount = GetMouseState(
+        m_lastMouseState.stateIndex,
+        mouseStates.data(),
+        static_cast<uint32_t>(mouseStates.size()));
 
-    // Update OS mouse position
-#if 0
-    const bool is_app_focused = (::GetForegroundWindow() == window.GetHandle());
-    if (is_app_focused)
+    for (uint32_t i = mouseStateCount; i > 0; --i)
     {
-        // (Optional) Fallback to provide mouse position when focused (WM_MOUSEMOVE already provides this when hovered or captured)
-        if (!io.WantSetMousePos && !bd->MouseTracked)
+        const MouseState& mouseState = mouseStates[i - 1];
+        const int dx = mouseState.x - m_lastMouseState.x;
+        const int dy = mouseState.y - m_lastMouseState.y;
+        const int wheel = mouseState.wheel - m_lastMouseState.wheel;
+        const int horizontalWheel = mouseState.horizontalWheel - m_lastMouseState.horizontalWheel;
+        const bool enteredWindow = !m_lastMouseState.inWindow && mouseState.inWindow;
+        const bool leftWindow = m_lastMouseState.inWindow && !mouseState.inWindow;
+
+        if (dx != 0 || dy != 0 || enteredWindow || leftWindow)
         {
-            POINT pos;
-            if (::GetCursorPos(&pos) && ::ScreenToClient(window.GetHandle(), &pos))
-                io.AddMousePosEvent((float)pos.x, (float)pos.y);
+            if (mouseState.inWindow)
+                io.AddMousePosEvent(static_cast<float>(mouseState.x), static_cast<float>(mouseState.y));
+            else
+                io.AddMousePosEvent(-FLT_MAX, -FLT_MAX);
         }
+
+        for (uint32_t i = 0; i < kMouseButtonCount; ++i)
+        {
+            if (m_lastMouseState.buttonsDown[i] != mouseState.buttonsDown[i])
+                io.AddMouseButtonEvent(static_cast<int>(i), mouseState.buttonsDown[i]);
+        }
+
+        if (wheel != 0 || horizontalWheel != 0)
+        {
+            io.AddMouseWheelEvent(
+                static_cast<float>(horizontalWheel) / kMouseWheelUnit,
+                static_cast<float>(wheel) / kMouseWheelUnit);
+        }
+
+        m_lastMouseState = mouseState;
     }
-#endif
-    // Process workarounds for known Windows key handling issues
-#if 0
-    ImGui_ImplWin32_ProcessKeyEventsWorkarounds();
-#endif
-    // Update OS mouse cursor with the cursor requested by imgui
-    ImGuiMouseCursor mouse_cursor = io.MouseDrawCursor ? ImGuiMouseCursor_None : ImGui::GetMouseCursor();
-    if (m_lastMouseCursor != mouse_cursor)
-    {
-        m_lastMouseCursor = mouse_cursor;
-        ImGuiIO& io = ImGui::GetIO();
-        if (io.ConfigFlags & ImGuiConfigFlags_NoMouseCursorChange)
-            return;
 
-        ImGuiMouseCursor imgui_cursor = ImGui::GetMouseCursor();
-        if (imgui_cursor == ImGuiMouseCursor_None || io.MouseDrawCursor)
-        {
-            // Hide OS mouse cursor if imgui is drawing it or if it wants no cursor
-            Window::SetCursor(NULL);
-        }
-        else
-        {
-            // Show OS mouse cursor
-            LPTSTR win32_cursor = IDC_ARROW;
-            switch (imgui_cursor)
-            {
-            case ImGuiMouseCursor_Arrow:        win32_cursor = IDC_ARROW; break;
-            case ImGuiMouseCursor_TextInput:    win32_cursor = IDC_IBEAM; break;
-            case ImGuiMouseCursor_ResizeAll:    win32_cursor = IDC_SIZEALL; break;
-            case ImGuiMouseCursor_ResizeEW:     win32_cursor = IDC_SIZEWE; break;
-            case ImGuiMouseCursor_ResizeNS:     win32_cursor = IDC_SIZENS; break;
-            case ImGuiMouseCursor_ResizeNESW:   win32_cursor = IDC_SIZENESW; break;
-            case ImGuiMouseCursor_ResizeNWSE:   win32_cursor = IDC_SIZENWSE; break;
-            case ImGuiMouseCursor_Hand:         win32_cursor = IDC_HAND; break;
-            case ImGuiMouseCursor_NotAllowed:   win32_cursor = IDC_NO; break;
-            }
-            Window::SetCursor(::LoadCursor(NULL, win32_cursor));
-        }
+    std::array<wchar_t, 256> textCharacters{};
+    const uint64_t nextTextInputIndex = ReadTextStream(
+        m_nextTextInputIndex,
+        textCharacters.data(),
+        static_cast<uint32_t>(textCharacters.size()));
+    const uint64_t textCharacterCount64 = nextTextInputIndex > m_nextTextInputIndex
+        ? nextTextInputIndex - m_nextTextInputIndex
+        : 0;
+    const uint32_t textCharacterCount = static_cast<uint32_t>(
+        std::min<uint64_t>(textCharacterCount64, textCharacters.size()));
+    for (uint32_t i = 0; i < textCharacterCount; ++i)
+    {
+        if (textCharacters[i] != 0)
+            io.AddInputCharacterUTF16(static_cast<ImWchar16>(textCharacters[i]));
+    }
+    m_nextTextInputIndex = nextTextInputIndex;
+
+    ImGuiMouseCursor mouseCursor = io.MouseDrawCursor ? ImGuiMouseCursor_None : ImGui::GetMouseCursor();
+    if (m_lastMouseCursor != mouseCursor)
+    {
+        m_lastMouseCursor = mouseCursor;
+        if ((io.ConfigFlags & ImGuiConfigFlags_NoMouseCursorChange) == 0)
+            WindowSetCursorShape(ToCursorShape(mouseCursor));
     }
 
     ImGui::NewFrame();
 }
-
-
-LRESULT DearImGuiManager::WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
-{
-    if (ImGui::GetCurrentContext() == NULL)
-        return 0;
-
-    ImGuiIO& io = ImGui::GetIO();
-
-    switch (msg)
-    {
-    case WM_MOUSEMOVE:
-        io.AddMousePosEvent((float)GET_X_LPARAM(lParam), (float)GET_Y_LPARAM(lParam));
-        break;
-    case WM_MOUSELEAVE:
-        io.AddMousePosEvent(-FLT_MAX, -FLT_MAX);
-        break;
-    case WM_LBUTTONDOWN: case WM_LBUTTONDBLCLK:
-    case WM_RBUTTONDOWN: case WM_RBUTTONDBLCLK:
-    case WM_MBUTTONDOWN: case WM_MBUTTONDBLCLK:
-    case WM_XBUTTONDOWN: case WM_XBUTTONDBLCLK:
-    {
-        int button = 0;
-        if (msg == WM_LBUTTONDOWN || msg == WM_LBUTTONDBLCLK) { button = 0; }
-        if (msg == WM_RBUTTONDOWN || msg == WM_RBUTTONDBLCLK) { button = 1; }
-        if (msg == WM_MBUTTONDOWN || msg == WM_MBUTTONDBLCLK) { button = 2; }
-        if (msg == WM_XBUTTONDOWN || msg == WM_XBUTTONDBLCLK) { button = (GET_XBUTTON_WPARAM(wParam) == XBUTTON1) ? 3 : 4; }
-        io.AddMouseButtonEvent(button, true);
-        return 0;
-    }
-    case WM_LBUTTONUP:
-    case WM_RBUTTONUP:
-    case WM_MBUTTONUP:
-    case WM_XBUTTONUP:
-    {
-        int button = 0;
-        if (msg == WM_LBUTTONUP) { button = 0; }
-        if (msg == WM_RBUTTONUP) { button = 1; }
-        if (msg == WM_MBUTTONUP) { button = 2; }
-        if (msg == WM_XBUTTONUP) { button = (GET_XBUTTON_WPARAM(wParam) == XBUTTON1) ? 3 : 4; }
-        io.AddMouseButtonEvent(button, false);
-        return 0;
-    }
-    case WM_MOUSEWHEEL:
-        io.AddMouseWheelEvent(0.0f, (float)GET_WHEEL_DELTA_WPARAM(wParam) / (float)WHEEL_DELTA);
-        return 0;
-    case WM_MOUSEHWHEEL:
-        io.AddMouseWheelEvent((float)GET_WHEEL_DELTA_WPARAM(wParam) / (float)WHEEL_DELTA, 0.0f);
-        return 0;
-#if 0
-    case WM_KEYDOWN:
-    case WM_KEYUP:
-    case WM_SYSKEYDOWN:
-    case WM_SYSKEYUP:
-    {
-        const bool is_key_down = (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN);
-        if (wParam < 256)
-        {
-            // Submit modifiers
-            ImGui_ImplWin32_UpdateKeyModifiers();
-
-            // Obtain virtual key code
-            // (keypad enter doesn't have its own... VK_RETURN with KF_EXTENDED flag means keypad enter, see IM_VK_KEYPAD_ENTER definition for details, it is mapped to ImGuiKey_KeyPadEnter.)
-            int vk = (int)wParam;
-            if ((wParam == VK_RETURN) && (HIWORD(lParam) & KF_EXTENDED))
-                vk = IM_VK_KEYPAD_ENTER;
-
-            // Submit key event
-            const ImGuiKey key = ImGui_ImplWin32_VirtualKeyToImGuiKey(vk);
-            const int scancode = (int)LOBYTE(HIWORD(lParam));
-            if (key != ImGuiKey_None)
-                ImGui_ImplWin32_AddKeyEvent(key, is_key_down, vk, scancode);
-
-            // Submit individual left/right modifier events
-            if (vk == VK_SHIFT)
-            {
-                // Important: Shift keys tend to get stuck when pressed together, missing key-up events are corrected in ImGui_ImplWin32_ProcessKeyEventsWorkarounds()
-                if (IsVkDown(VK_LSHIFT) == is_key_down) { ImGui_ImplWin32_AddKeyEvent(ImGuiKey_LeftShift, is_key_down, VK_LSHIFT, scancode); }
-                if (IsVkDown(VK_RSHIFT) == is_key_down) { ImGui_ImplWin32_AddKeyEvent(ImGuiKey_RightShift, is_key_down, VK_RSHIFT, scancode); }
-            }
-            else if (vk == VK_CONTROL)
-            {
-                if (IsVkDown(VK_LCONTROL) == is_key_down) { ImGui_ImplWin32_AddKeyEvent(ImGuiKey_LeftCtrl, is_key_down, VK_LCONTROL, scancode); }
-                if (IsVkDown(VK_RCONTROL) == is_key_down) { ImGui_ImplWin32_AddKeyEvent(ImGuiKey_RightCtrl, is_key_down, VK_RCONTROL, scancode); }
-            }
-            else if (vk == VK_MENU)
-            {
-                if (IsVkDown(VK_LMENU) == is_key_down) { ImGui_ImplWin32_AddKeyEvent(ImGuiKey_LeftAlt, is_key_down, VK_LMENU, scancode); }
-                if (IsVkDown(VK_RMENU) == is_key_down) { ImGui_ImplWin32_AddKeyEvent(ImGuiKey_RightAlt, is_key_down, VK_RMENU, scancode); }
-            }
-        }
-        return 0;
-    }
-#endif
-    case WM_SETFOCUS:
-    case WM_KILLFOCUS:
-        io.AddFocusEvent(msg == WM_SETFOCUS);
-        return 0;
-    case WM_CHAR:
-        // You can also use ToAscii()+GetKeyboardState() to retrieve characters.
-        if (wParam > 0 && wParam < 0x10000)
-            io.AddInputCharacterUTF16((unsigned short)wParam);
-        return 0;
-    }
-    return 0;
-}
-
 
 }

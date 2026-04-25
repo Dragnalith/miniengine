@@ -14,7 +14,7 @@
 #include <deque>
 #include <format>
 
-namespace engine
+namespace migi
 {
 
 class JobQueue;
@@ -52,18 +52,18 @@ public:
         AssertValid();
         m_fiber = ::CreateFiber(64 * 1024, FiberJob::FiberFunc, this);
         m_fiber_name = name;
-        ASSERT_MSG(m_fiber != nullptr, "Fiber creation has failed");
+        MIGI_ASSERT(m_fiber != nullptr, "Fiber creation has failed");
     }
 
     void SetJob(const JobDesc& job)
     {
-        ASSERT_MSG(IsDone(), "Job is not done");
+        MIGI_ASSERT(IsDone(), "Job is not done");
         m_job = job;
         AssertValid();
     }
     ~FiberJob() {
         if (m_fiber != nullptr) {
-            ASSERT_MSG(IsDone(), "fiber is destroyed, but func is not complete. something is wrong");
+            MIGI_ASSERT(IsDone(), "fiber is destroyed, but func is not complete. something is wrong");
             ::DeleteFiber(m_fiber);
         }
     }
@@ -80,9 +80,9 @@ public:
         }
         JobCounter* handle = m_job.m_handle;
         m_job = JobDesc();
-        ASSERT_MSG(handle != nullptr, "Handle is null");
+        MIGI_ASSERT(handle != nullptr, "Handle is null");
         int64_t value = handle->m_counter.fetch_sub(1);
-        ASSERT_MSG(value > 0, "handle issue when decrement");
+        MIGI_ASSERT(value > 0, "handle issue when decrement");
     }
     static void FiberFunc(void* data) {
         FiberJob* fiberJob = reinterpret_cast<FiberJob*>(data);
@@ -109,17 +109,17 @@ public:
     void* GetFiberHandle() { return m_fiber; }
     const char* GetFiberName() { return m_fiber_name.c_str(); }
     void AssertValid() {
-        ASSERT_MSG(m_job.m_handle == nullptr || m_job.m_handle->m_test == 0xdeadbeef, "invalid handle");
+        MIGI_ASSERT(m_job.m_handle == nullptr || m_job.m_handle->m_test == 0xdeadbeef, "invalid handle");
     }
     bool IsDone() const { 
         if (m_job.m_name == nullptr) {
-            ASSERT_MSG(!m_job.m_delegate, "delegate is not empty");
-            ASSERT_MSG(m_job.m_handle == nullptr, "handle is not null");
+            MIGI_ASSERT(!m_job.m_delegate, "delegate is not empty");
+            MIGI_ASSERT(m_job.m_handle == nullptr, "handle is not null");
             return true;
         }
         else {
-            ASSERT_MSG(m_job.m_delegate, "delegate is empty");
-            ASSERT_MSG(m_job.m_handle != nullptr, "handle is null");
+            MIGI_ASSERT(m_job.m_delegate, "delegate is empty");
+            MIGI_ASSERT(m_job.m_handle != nullptr, "handle is null");
             return false;
         }
     }
@@ -145,7 +145,7 @@ public:
     JobQueue& operator=(const JobQueue&) = delete;
 
     ~JobQueue() {
-        ASSERT_MSG(m_jobTotalNumber.load() == 0, "Problem: job remain after the queue is destroyed");
+        MIGI_ASSERT(m_jobTotalNumber.load() == 0, "Problem: job remain after the queue is destroyed");
         std::cout << "Number of allocated fiber: " << m_freeFiber.size() << "\n";
     }
 
@@ -182,7 +182,7 @@ public:
                 job = std::move(m_freeFiber.front());
                 m_freeFiber.pop_front();
                 size_t afterSize = m_freeFiber.size();
-                ASSERT_MSG(beforeSize == afterSize + 1, "Problem of free fiber pop");
+                MIGI_ASSERT(beforeSize == afterSize + 1, "Problem of free fiber pop");
             }
         }
         job->SetJob(jobDesc);
@@ -196,7 +196,7 @@ public:
         }
 
         int64_t value = m_jobTotalNumber.fetch_sub(1);
-        ASSERT_MSG(value > 0, "job count issue when decrement");
+        MIGI_ASSERT(value > 0, "job count issue when decrement");
     }
     std::unique_ptr<FiberJob> Pop() {
         std::scoped_lock<SpinLock> lock(m_fiberQueueLock);
@@ -239,11 +239,11 @@ public:
     void EnqueueJob(const JobDesc& jobDesc) {
         {
             int64_t value = m_jobTotalNumber.fetch_add(1);
-            ASSERT_MSG(value >= 0, "job count issue when increment");
+            MIGI_ASSERT(value >= 0, "job count issue when increment");
         }
         {
             int64_t value = jobDesc.m_handle->m_counter.fetch_add(1);
-            ASSERT_MSG(value >= 0, "handle issue when increment");
+            MIGI_ASSERT(value >= 0, "handle issue when increment");
         }
         std::scoped_lock<SpinLock> lock(m_jobLock);
         m_jobs.push_back(jobDesc);
@@ -287,7 +287,7 @@ public:
     }
 
     void SetWaitingHandle(JobCounter& handle, int64_t value, int64_t reset, const std::source_location location) {
-        ASSERT_MSG(m_currentFiber != nullptr, "Wait can only be called from a Job");
+        MIGI_ASSERT(m_currentFiber != nullptr, "Wait can only be called from a Job");
         m_currentFiber->SetWaitingHandle(handle, value, reset, location);
 
     }
@@ -344,7 +344,7 @@ private:
 
 void Job::YieldJob() 
 {
-    ASSERT_MSG(g_threadFiber != nullptr, "Yield can only be called from a job");
+    MIGI_ASSERT(g_threadFiber != nullptr, "Yield can only be called from a job");
     SWITCH_TO_FIBER(g_threadFiber, g_threadFiberName);
 }
 
@@ -357,14 +357,14 @@ void Job::Wait(JobCounter& handle, int64_t value, const std::source_location loc
 }
 
 void Job::Wait(JobCounter& handle, int64_t value, int64_t reset, const std::source_location location) {
-    ASSERT_MSG(g_threadWorker != nullptr, "Wait can only be called from a worker");
+    MIGI_ASSERT(g_threadWorker != nullptr, "Wait can only be called from a worker");
     g_threadWorker->SetWaitingHandle(handle, value, reset, location);
     YieldJob();
 }
 
 
 void Job::Dispatch(const char* name, JobCounter& handle, std::function<void()> func) {
-    ASSERT_MSG(g_jobQueue != nullptr, "DispatchJob can only be called from a worker");
+    MIGI_ASSERT(g_jobQueue != nullptr, "DispatchJob can only be called from a worker");
     g_jobQueue->Dispatch(name, handle, func);
 }
 

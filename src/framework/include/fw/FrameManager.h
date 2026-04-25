@@ -9,7 +9,7 @@
 #include <stdint.h>
 #include <mutex>
 
-namespace engine
+namespace migi
 {
 
 struct FrameUpdateResult;
@@ -32,7 +32,7 @@ private:
 private:
     IFramePipeline& m_pipeline;
 
-    Clock::time_point m_lastStartFrameTime;
+    TimePoint m_lastStartFrameTime;
 
     JobCounter m_handle;
     JobCounter m_renderSemaphore; // We should guarantee render stage progress in order, first in first out, so we cannot use JobSemaphore
@@ -44,4 +44,4 @@ private:
     int64_t m_maxFrameLatency = 0;
 };
 
-} // namespace engine
+} // namespace migi

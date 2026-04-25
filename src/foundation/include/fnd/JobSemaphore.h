@@ -6,7 +6,7 @@
 #include <atomic>
 #include <functional>
 
-namespace engine
+namespace migi
 {
 
 class JobSemaphore

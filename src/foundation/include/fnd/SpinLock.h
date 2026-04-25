@@ -2,7 +2,7 @@
 
 #include <atomic>
 
-namespace engine
+namespace migi
 {
 
 class SpinLock

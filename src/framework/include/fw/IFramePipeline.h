@@ -2,7 +2,7 @@
 
 #include <fw/FrameData.h>
 
-namespace engine
+namespace migi
 {
 
 /* 
@@ -24,4 +24,4 @@ public:
     virtual void Clean(const FrameData& frameData) = 0; // Run after the frame has been presented
 };
 
-} // namespace engine
+} // namespace migi

@@ -3,7 +3,9 @@
 #include <fnd/Util.h>
 #include <fw/IGame.h>
 
-namespace engine
+#include <cstdint>
+
+namespace migi
 {
 struct FrameData;
 }
@@ -11,14 +13,14 @@ struct FrameData;
 namespace app
 {
 
-class Game : public engine::IGame
+class Game : public migi::IGame
 {
 public:
     Game();
-    virtual void Update(engine::FrameData& frameData);
+    virtual void Update(migi::FrameData& frameData);
 
 private:
-    engine::Clock::time_point m_lastQuitTime;
+    uint64_t m_lastClosePressEventIndex = 0;
 
     bool m_fullscreen = false;
     bool m_vsync = true;

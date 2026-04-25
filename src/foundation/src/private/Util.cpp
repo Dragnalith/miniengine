@@ -2,14 +2,14 @@
 
 #include <fnd/Util.h>
 
-namespace engine
+namespace migi
 {
 
 void RandomWorkload(int microsecond, int random_percent) {
-    Time start = Clock::now();
+    TimePoint start = TimePoint::Now();
     while (true) {
-        Time now = Clock::now();
-        int64_t us = to_us(now - start);
+        TimePoint now = TimePoint::Now();
+        int64_t us = (now - start).ToMicroseconds();
         if (us >= microsecond) {
             return;
         }

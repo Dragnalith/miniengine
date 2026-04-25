@@ -1,6 +1,7 @@
 #include <fnd/JobSemaphore.h>
+#include <fnd/Assert.h>
 
-namespace engine
+namespace migi
 {
 
 JobSemaphore::JobSemaphore() {
@@ -12,7 +13,7 @@ int JobSemaphore::Acquire() {
 			std::scoped_lock<SpinLock> lock(m_lock);
 			if (m_counter > 0) {
 				m_counter -= 1;
-				ASSERT_MSG(m_counter >= 0, "JobSemaphore token counter should not be negative");
+				MIGI_ASSERT(m_counter >= 0, "JobSemaphore token counter should not be negative");
 				return m_counter;
 			}
 			m_event.Set(1);

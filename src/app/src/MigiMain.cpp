@@ -9,7 +9,7 @@
 #include <imgui/imgui.h>
 
 #include <fnd/Window.h>
-#include <fnd/AppMain.h>
+#include <fnd/MigiMain.h>
 #include <fw/RenderDevice.h>
 #include <fw/SwapChain.h>
 #include <fw/DearImGuiManager.h>
@@ -21,15 +21,15 @@
 
 #include <iostream>
 
-void AppMain()
+void MigiMain()
 {
-    engine::RenderDevice renderDevice;
-    engine::SwapChain swapChain(renderDevice);
-    engine::DearImGuiManager imguiManager;
-    engine::Renderer renderer(renderDevice, swapChain, imguiManager);
+    migi::RenderDevice renderDevice;
+    migi::SwapChain swapChain(renderDevice);
+    migi::DearImGuiManager imguiManager;
+    migi::Renderer renderer(renderDevice, swapChain, imguiManager);
     app::Game game;
-    engine::DefaultFramePipeline pipeline(imguiManager, renderer, game);
-    engine::FrameManager frameManager(pipeline);
+    migi::DefaultFramePipeline pipeline(imguiManager, renderer, game);
+    migi::FrameManager frameManager(pipeline);
 
     frameManager.Start();
 }

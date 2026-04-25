@@ -1,34 +1,60 @@
 #include <fnd/Window.h>
-#include <tchar.h>
 
-namespace engine
+#include <private/WindowManager.h>
+#include <fnd/Util.h>
+
+namespace
+{
+migi::WindowManager* g_windowManager = nullptr;
+}
+
+namespace migi
 {
 
-Window::Window(HWND hwnd, int w, int h)
-    : m_hwnd(hwnd)
-    , m_w(w)
-    , m_h(h)
+void SetActiveWindowManager(WindowManager* manager)
 {
-};
-
-void Window::GetSize(int* w, int*h) const {
-    std::scoped_lock scoped(m_lock);
-    *w = m_w;
-    *h = m_h;
+    g_windowManager = manager;
 }
 
-Clock::time_point Window::GetLastQuitTime() const {
-    std::scoped_lock scoped(m_lock);
-    return m_lastQuitTime;
+static WindowManager& ActiveWindowManager()
+{
+    MIGI_ASSERT(g_windowManager != nullptr, "Error: window manager not initialized");
+    return *g_windowManager;
 }
-std::vector<WindowMsg> Window::PopMsg() {
-    std::vector<WindowMsg> result;
-    {
-        std::scoped_lock scoped(m_lock);
-        m_messageStack.swap(result);
-    }
-    return result;
+
+Int2 WindowGetSize()
+{
+    return ActiveWindowManager().GetSize();
+}
+
+uint64_t WindowGetLastClosePressEventIndex()
+{
+    return ActiveWindowManager().GetLastClosePressEventIndex();
+}
+
+uint32_t GetMouseState(uint64_t lastStateIndex, MouseState* states, uint32_t maxStateCount)
+{
+    return ActiveWindowManager().GetMouseState(lastStateIndex, states, maxStateCount);
+}
+
+uint32_t GetKeyboardState(uint64_t lastStateIndex, KeyboardState* states, uint32_t maxStateCount)
+{
+    return ActiveWindowManager().GetKeyboardState(lastStateIndex, states, maxStateCount);
+}
+
+uint64_t ReadTextStream(uint64_t firstIndex, wchar_t* characters, uint32_t maxCharacterCount)
+{
+    return ActiveWindowManager().ReadTextStream(firstIndex, characters, maxCharacterCount);
+}
+
+void WindowSetCursorShape(CursorShape shape)
+{
+    ActiveWindowManager().SetCursorShape(shape);
+}
+
+void* WindowGetNativeHandle()
+{
+    return ActiveWindowManager().GetNativeHandle();
 }
 
 }
-
