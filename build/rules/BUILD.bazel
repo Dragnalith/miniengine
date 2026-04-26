@@ -1,0 +1,12 @@
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "asset_files.bzl",
+    "asset_group.bzl",
+    "providers.bzl",
+    "shader.bzl",
+    "shader_toolchain.bzl",
+    "windows_app.bzl",
+])
+
+toolchain_type(name = "shader_toolchain_type")

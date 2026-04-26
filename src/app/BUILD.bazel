@@ -1,7 +1,8 @@
 load("@rules_cc//cc:defs.bzl", "cc_binary")
+load("//build/rules:windows_app.bzl", "windows_app")
 
 cc_binary(
-    name = "app",
+    name = "app_binary",
     srcs = glob([
         "src/**/*.cpp",
         "include/app/*.h",
@@ -11,9 +12,14 @@ cc_binary(
         "//src/foundation",
         "//src/framework",
         "@msvc_toolchains//lib:d3d12",
-        "@msvc_toolchains//lib:d3dcompiler",
         "@msvc_toolchains//lib:dxgi",
         "@msvc_toolchains//lib:kernel32",
         "@msvc_toolchains//lib:user32",
     ],
+)
+
+windows_app(
+    name = "app",
+    assets = "//src/framework:assets",
+    binary = ":app_binary",
 )

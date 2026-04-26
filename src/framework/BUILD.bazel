@@ -1,4 +1,6 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
+load("//build/rules:asset_group.bzl", "asset_group")
+load("//build/rules:shader.bzl", "shader_stage")
 
 cc_library(
     name = "_private_includes",
@@ -24,10 +26,30 @@ cc_library(
     deps = [
         "//src/foundation",
         "@msvc_toolchains//lib:d3d12",
-        "@msvc_toolchains//lib:d3dcompiler",
         "@msvc_toolchains//lib:dxgi",
         "@msvc_toolchains//lib:imm32",
         "@msvc_toolchains//lib:kernel32",
         "@msvc_toolchains//lib:user32",
     ],
+)
+
+shader_stage(
+    name = "dear_imgui_vertex",
+    src = "shaders/dear_imgui_vertex.hlsl",
+    stage = "vertex",
+)
+
+shader_stage(
+    name = "dear_imgui_pixel",
+    src = "shaders/dear_imgui_pixel.hlsl",
+    stage = "pixel",
+)
+
+asset_group(
+    name = "assets",
+    srcs = [
+        ":dear_imgui_pixel",
+        ":dear_imgui_vertex",
+    ],
+    visibility = ["//visibility:public"],
 )

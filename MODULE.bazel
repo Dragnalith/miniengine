@@ -1,4 +1,5 @@
 bazel_dep(name = "rules_cc", version = "0.2.17")
+bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "toolchains_msvc", version = "0.1.0")
 git_override(
     module_name = "toolchains_msvc",
@@ -21,3 +22,7 @@ toolchain.toolchain_set(
 use_repo(toolchain, "msvc_toolchains")
 
 register_toolchains("@msvc_toolchains//:all")
+register_toolchains(
+    "//thirdparty/DirectXShaderCompiler:dxc_dxil_toolchain",
+    "//thirdparty/DirectXShaderCompiler:dxc_spirv_toolchain",
+)
