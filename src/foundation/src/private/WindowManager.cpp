@@ -12,6 +12,7 @@
 #include <array>
 #include <deque>
 #include <future>
+#include <string>
 #include <thread>
 
 namespace migi
@@ -456,6 +457,12 @@ struct WindowManagerImpl
             ::SetCursor(cursor);
     }
 
+    void SetTitle(const char* title)
+    {
+        if (hwnd != nullptr)
+            ::SetWindowTextA(hwnd, title != nullptr ? title : "");
+    }
+
     void* GetNativeHandle() const
     {
         return hwnd;
@@ -532,6 +539,14 @@ uint32_t WindowManager::GetKeyboardState(uint64_t lastStateIndex, KeyboardState*
 uint64_t WindowManager::ReadTextStream(uint64_t firstIndex, wchar_t* characters, uint32_t maxCharacterCount) const
 {
     return m_impl->ReadTextStream(firstIndex, characters, maxCharacterCount);
+}
+
+void WindowManager::SetTitle(const char* title)
+{
+    std::string copiedTitle = title != nullptr ? title : "";
+    m_impl->taskQueue.Push([this, title = std::move(copiedTitle)] {
+        m_impl->SetTitle(title.c_str());
+    });
 }
 
 void WindowManager::SetCursorShape(CursorShape shape)

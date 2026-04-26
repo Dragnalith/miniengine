@@ -1,8 +1,9 @@
 #pragma once
 
 #include <cstdint>
+#include <cstddef>
 #include <memory>
-#include <string_view>
+#include <span>
 
 namespace drgn
 {
@@ -80,16 +81,16 @@ enum class BlendMode : uint8_t
 
 struct ShaderPipelineDesc
 {
-    // HLSL source. Both stages may share the same source if both entry points
-    // live in it. Entry points are conventional: VSMain / PSMain.
+    // Compiled shader bytecode. The asset filename is platform-neutral
+    // (.shaderb); the backend interprets the content for the active API.
     //
     // There is no input-assembler vertex layout. DrawIndexed() supplies GPU
     // addresses for the vertex buffer, index buffer, and user data. The backend
     // binds those addresses at fixed shader-visible locations by convention;
     // the vertex shader pulls vertex data itself, typically indexed by
     // SV_VertexID. The vertex/user structs are defined in HLSL.
-    std::string_view vertexShaderHLSL;
-    std::string_view pixelShaderHLSL;
+    std::span<const std::byte> vertexShader;
+    std::span<const std::byte> pixelShader;
 };
 
 struct BufferDesc
@@ -113,6 +114,7 @@ struct SwapChainDesc
     uint32_t height       = 0;
     uint32_t bufferCount  = 2;
     Format   colorFormat  = Format::R8G8B8A8_UNORM;
+    bool     fullscreen   = false;
 };
 
 
@@ -133,6 +135,17 @@ struct Scissor
 {
     int32_t  x = 0,     y = 0;
     uint32_t width = 0, height = 0;
+};
+
+struct DrawIndexedDesc
+{
+    GpuAddress vertexBuffer = kNullGpuAddress;
+    GpuAddress indexBuffer = kNullGpuAddress;
+    GpuAddress userData = kNullGpuAddress;
+    uint32_t indexCount = 0;
+    uint32_t firstIndex = 0;
+    int32_t vertexOffset = 0;
+    Format indexFormat = Format::R16_UINT;
 };
 
 
@@ -158,11 +171,9 @@ public:
 
     // vertexBuffer, indexBuffer, and userData are GPU addresses. Their shader
     // binding locations are fixed by backend convention, not described by the
-    // pipeline. indexCount is the only draw count exposed by this minimal RHI.
-    virtual void DrawIndexed(GpuAddress vertexBuffer,
-                             GpuAddress indexBuffer,
-                             GpuAddress userData,
-                             uint32_t   indexCount) = 0;
+    // pipeline. Backends may implement the indexed lookup as shader-pulled
+    // indexing instead of an input-assembler indexed draw.
+    virtual void DrawIndexed(const DrawIndexedDesc& desc) = 0;
 };
 
 
@@ -200,6 +211,10 @@ public:
     virtual void                 DestroyShaderPipeline(ShaderPipelineHandle handle)    = 0;
 
     virtual SwapChainHandle      CreateSwapChain (const SwapChainDesc& desc) = 0;
+    virtual void                 ResizeSwapChain (SwapChainHandle handle,
+                                                  uint32_t width,
+                                                  uint32_t height,
+                                                  bool fullscreen = false)   = 0;
     virtual void                 DestroySwapChain(SwapChainHandle handle)    = 0;
 
     // ---- Submission ----

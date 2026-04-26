@@ -32,6 +32,11 @@ uint64_t WindowGetLastClosePressEventIndex()
     return ActiveWindowManager().GetLastClosePressEventIndex();
 }
 
+void WindowSetTitle(const char* title)
+{
+    ActiveWindowManager().SetTitle(title);
+}
+
 uint32_t GetMouseState(uint64_t lastStateIndex, MouseState* states, uint32_t maxStateCount)
 {
     return ActiveWindowManager().GetMouseState(lastStateIndex, states, maxStateCount);

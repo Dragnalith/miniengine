@@ -23,6 +23,7 @@ enum class CursorShape : uint8_t
 
 Int2 WindowGetSize();
 uint64_t WindowGetLastClosePressEventIndex();
+void WindowSetTitle(const char* title);
 void WindowSetCursorShape(CursorShape shape);
 void* WindowGetNativeHandle();
 

@@ -25,6 +25,7 @@ public:
     uint32_t GetKeyboardState(uint64_t lastStateIndex, KeyboardState* states, uint32_t maxStateCount) const;
     uint64_t ReadTextStream(uint64_t firstIndex, wchar_t* characters, uint32_t maxCharacterCount) const;
 
+    void SetTitle(const char* title);
     void SetCursorShape(CursorShape shape);
     void* GetNativeHandle() const;
 

@@ -1,16 +1,17 @@
 #pragma once
 
 #include <fnd/Pimpl.h>
-#include <fnd/Window.h>
 #include <fw/FrameData.h>
 
-struct ID3D12GraphicsCommandList;
-struct ImDrawData;
+namespace drgn
+{
+class CommandList;
+class RHI;
+}
 
 namespace migi
 {
 
-class RenderDevice;
 class DearImGuiManager;
 
 struct DearImGuiRendererImpl;
@@ -18,10 +19,10 @@ struct DearImGuiRendererImpl;
 class DearImGuiRenderer
 {
 public:
-	DearImGuiRenderer(RenderDevice& renderDevice, DearImGuiManager& manager);
+	DearImGuiRenderer(drgn::RHI& rhi, DearImGuiManager& manager);
 	~DearImGuiRenderer();
 
-	void Render(ID3D12GraphicsCommandList* commandList, const DrawData& drawData);
+	void Render(drgn::CommandList& commandList, const DrawData& drawData);
 
 private:
 	Pimpl<DearImGuiRendererImpl> m_impl;

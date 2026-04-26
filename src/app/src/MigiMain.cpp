@@ -10,8 +10,6 @@
 
 #include <fnd/Window.h>
 #include <fnd/MigiMain.h>
-#include <fw/RenderDevice.h>
-#include <fw/SwapChain.h>
 #include <fw/DearImGuiManager.h>
 #include <fw/Renderer.h>
 #include <fw/FrameData.h>
@@ -23,10 +21,10 @@
 
 void MigiMain()
 {
-    migi::RenderDevice renderDevice;
-    migi::SwapChain swapChain(renderDevice);
+    migi::WindowSetTitle("MiniEngine App");
+
     migi::DearImGuiManager imguiManager;
-    migi::Renderer renderer(renderDevice, swapChain, imguiManager);
+    migi::Renderer renderer(imguiManager);
     app::Game game;
     migi::DefaultFramePipeline pipeline(imguiManager, renderer, game);
     migi::FrameManager frameManager(pipeline);

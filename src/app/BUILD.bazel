@@ -11,8 +11,6 @@ cc_binary(
     deps = [
         "//src/foundation",
         "//src/framework",
-        "@msvc_toolchains//lib:d3d12",
-        "@msvc_toolchains//lib:dxgi",
         "@msvc_toolchains//lib:kernel32",
         "@msvc_toolchains//lib:user32",
     ],

@@ -1,0 +1,41 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary")
+load("//build/rules:asset_group.bzl", "asset_group")
+load("//build/rules:shader.bzl", "shader_stage")
+load("//build/rules:windows_app.bzl", "windows_app")
+
+cc_binary(
+    name = "triangle_binary",
+    srcs = ["TriangleExample.cpp"],
+    deps = [
+        "//src/foundation",
+        "//src/rhi",
+        "@msvc_toolchains//lib:kernel32",
+        "@msvc_toolchains//lib:user32",
+    ],
+)
+
+shader_stage(
+    name = "triangle_vertex",
+    src = "shaders/triangle_vertex.hlsl",
+    stage = "vertex",
+)
+
+shader_stage(
+    name = "triangle_pixel",
+    src = "shaders/triangle_pixel.hlsl",
+    stage = "pixel",
+)
+
+asset_group(
+    name = "assets",
+    srcs = [
+        ":triangle_pixel",
+        ":triangle_vertex",
+    ],
+)
+
+windows_app(
+    name = "triangle",
+    assets = ":assets",
+    binary = ":triangle_binary",
+)
