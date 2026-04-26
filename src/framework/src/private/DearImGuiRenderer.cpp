@@ -3,6 +3,9 @@
 
 #include <fnd/Assert.h>
 
+#include <fstream>
+#include <vector>
+
 // dear imgui: Renderer Backend for DirectX12
 // This needs to be used along with a Platform Backend (e.g. Win32)
 
@@ -47,10 +50,6 @@
 // DirectX
 #include <d3d12.h>
 #include <dxgi1_4.h>
-#include <d3dcompiler.h>
-#ifdef _MSC_VER
-#pragma comment(lib, "d3dcompiler") // Automatically link with d3dcompiler.lib as we are using D3DCompile() below.
-#endif
 
 namespace
 {
@@ -95,6 +94,24 @@ struct VERTEX_CONSTANT_BUFFER_DX12
 {
     float   mvp[4][4];
 };
+
+std::vector<char> LoadBundledFile(const char* relativePath)
+{
+    std::ifstream file(relativePath, std::ios::binary | std::ios::ate);
+    MIGI_ASSERT(file.is_open(), "Cannot open bundled file");
+
+    const std::ifstream::pos_type end = file.tellg();
+    MIGI_ASSERT(end >= 0, "Cannot determine bundled file size");
+
+    std::vector<char> bytes(static_cast<size_t>(end));
+    file.seekg(0, std::ios::beg);
+    if (!bytes.empty())
+    {
+        file.read(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+        MIGI_ASSERT(file.good(), "Cannot read bundled file");
+    }
+    return bytes;
+}
 
 // Backend data stored in io.BackendRendererUserData to allow support for multiple Dear ImGui contexts
 // It is STRONGLY preferred that you use docking branch with multi-viewports (== single Dear ImGui context + multiple windows) instead of multiple Dear ImGui contexts.
@@ -547,12 +564,6 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
         blob->Release();
     }
 
-    // By using D3DCompile() from <d3dcompiler.h> / d3dcompiler.lib, we introduce a dependency to a given version of d3dcompiler_XX.dll (see D3DCOMPILER_DLL_A)
-    // If you would like to use this DX12 sample code but remove this dependency you can:
-    //  1) compile once, save the compiled shader blobs into a file or source code and pass them to CreateVertexShader()/CreatePixelShader() [preferred solution]
-    //  2) use code to detect any version of the DLL and grab a pointer to D3DCompile from the DLL.
-    // See https://github.com/ocornut/imgui/pull/638 for sources and details.
-
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc;
     memset(&psoDesc, 0, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
     psoDesc.NodeMask = 1;
@@ -564,42 +575,12 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
     psoDesc.SampleDesc.Count = 1;
     psoDesc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
 
-    ID3DBlob* vertexShaderBlob;
-    ID3DBlob* pixelShaderBlob;
+    std::vector<char> vertexShaderBlob = LoadBundledFile("assets/shaders/dear_imgui_vertex.dxil");
+    std::vector<char> pixelShaderBlob = LoadBundledFile("assets/shaders/dear_imgui_pixel.dxil");
 
     // Create the vertex shader
     {
-        static const char* vertexShader =
-            "cbuffer vertexBuffer : register(b0) \
-            {\
-              float4x4 ProjectionMatrix; \
-            };\
-            struct VS_INPUT\
-            {\
-              float2 pos : POSITION;\
-              float4 col : COLOR0;\
-              float2 uv  : TEXCOORD0;\
-            };\
-            \
-            struct PS_INPUT\
-            {\
-              float4 pos : SV_POSITION;\
-              float4 col : COLOR0;\
-              float2 uv  : TEXCOORD0;\
-            };\
-            \
-            PS_INPUT main(VS_INPUT input)\
-            {\
-              PS_INPUT output;\
-              output.pos = mul( ProjectionMatrix, float4(input.pos.xy, 0.f, 1.f));\
-              output.col = input.col;\
-              output.uv  = input.uv;\
-              return output;\
-            }";
-
-        if (FAILED(D3DCompile(vertexShader, strlen(vertexShader), NULL, NULL, NULL, "main", "vs_5_0", 0, 0, &vertexShaderBlob, NULL)))
-            return false; // NB: Pass ID3D10Blob* pErrorBlob to D3DCompile() to get error showing in (const char*)pErrorBlob->GetBufferPointer(). Make sure to Release() the blob!
-        psoDesc.VS = { vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize() };
+        psoDesc.VS = { vertexShaderBlob.data(), vertexShaderBlob.size() };
 
         // Create the input layout
         static D3D12_INPUT_ELEMENT_DESC local_layout[] =
@@ -613,28 +594,7 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
 
     // Create the pixel shader
     {
-        static const char* pixelShader =
-            "struct PS_INPUT\
-            {\
-              float4 pos : SV_POSITION;\
-              float4 col : COLOR0;\
-              float2 uv  : TEXCOORD0;\
-            };\
-            SamplerState sampler0 : register(s0);\
-            Texture2D texture0 : register(t0);\
-            \
-            float4 main(PS_INPUT input) : SV_Target\
-            {\
-              float4 out_col = input.col * texture0.Sample(sampler0, input.uv); \
-              return out_col; \
-            }";
-
-        if (FAILED(D3DCompile(pixelShader, strlen(pixelShader), NULL, NULL, NULL, "main", "ps_5_0", 0, 0, &pixelShaderBlob, NULL)))
-        {
-            vertexShaderBlob->Release();
-            return false; // NB: Pass ID3D10Blob* pErrorBlob to D3DCompile() to get error showing in (const char*)pErrorBlob->GetBufferPointer(). Make sure to Release() the blob!
-        }
-        psoDesc.PS = { pixelShaderBlob->GetBufferPointer(), pixelShaderBlob->GetBufferSize() };
+        psoDesc.PS = { pixelShaderBlob.data(), pixelShaderBlob.size() };
     }
 
     // Create the blending setup
@@ -680,8 +640,6 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
     }
 
     HRESULT result_pipeline_state = bd->pd3dDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&bd->pPipelineState));
-    vertexShaderBlob->Release();
-    pixelShaderBlob->Release();
     if (result_pipeline_state != S_OK)
         return false;
 

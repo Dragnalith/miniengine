@@ -2,3 +2,13 @@
 *.bat text eol=crlf
 *.cmd text eol=crlf
 *.ps1 text eol=crlf
+
+*.exe binary
+*.dll binary
+*.lib binary
+*.pdb binary
+*.so binary
+*.dylib binary
+*.a binary
+*.o binary
+*.obj binary
