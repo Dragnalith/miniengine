@@ -1,0 +1,22 @@
+load(":gpuapi.bzl", "gpuapi")
+
+package(default_visibility = ["//visibility:public"])
+
+gpuapi(
+    name = "gpuapi",
+    build_setting_default = "DX12",
+)
+
+config_setting(
+    name = "gpuapi_dx12",
+    flag_values = {
+        ":gpuapi": "DX12",
+    },
+)
+
+config_setting(
+    name = "gpuapi_vulkan",
+    flag_values = {
+        ":gpuapi": "Vulkan",
+    },
+)

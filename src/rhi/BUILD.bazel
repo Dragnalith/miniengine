@@ -7,19 +7,68 @@ cc_library(
 )
 
 cc_library(
-    name = "rhi",
-    srcs = glob(["src/private/**/*.cpp"]),
+    name = "rhi_api",
     hdrs = glob(["include/rhi/*.h"]),
+    strip_include_prefix = "include",
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "rhi_dx12",
+    srcs = glob(["src/DX12/private/**/*.cpp"]),
     implementation_deps = [
         "_private_includes",
     ],
-    strip_include_prefix = "include",
-    visibility = ["//visibility:public"],
+    visibility = ["//visibility:private"],
     deps = [
+        ":rhi_api",
         "//src/foundation",
         "@msvc_toolchains//lib:d3d12",
         "@msvc_toolchains//lib:dxgi",
         "@msvc_toolchains//lib:kernel32",
         "@msvc_toolchains//lib:user32",
+    ],
+)
+
+cc_library(
+    name = "rhi_vulkan",
+    srcs = glob(["src/Vulkan/private/**/*.cpp"]),
+    implementation_deps = [
+        "_private_includes",
+    ],
+    visibility = ["//visibility:private"],
+    deps = [
+        ":rhi_api",
+        "//src/foundation",
+        "//thirdparty/VulkanSDK:vulkan",
+        "@msvc_toolchains//lib:kernel32",
+    ],
+)
+
+alias(
+    name = "selected_rhi_backend",
+    actual = select({
+        "//build/config:gpuapi_vulkan": ":rhi_vulkan",
+        "//conditions:default": ":rhi_dx12",
+    }),
+    visibility = ["//visibility:private"],
+)
+
+cc_library(
+    name = "rhi",
+    defines = select({
+        "//build/config:gpuapi_vulkan": [
+            "DRGN_GPUAPI_NAME=\\\"Vulkan\\\"",
+            "DRGN_GPUAPI_VULKAN=1",
+        ],
+        "//conditions:default": [
+            "DRGN_GPUAPI_DX12=1",
+            "DRGN_GPUAPI_NAME=\\\"DX12\\\"",
+        ],
+    }),
+    visibility = ["//visibility:public"],
+    deps = [
+        ":rhi_api",
+        ":selected_rhi_backend",
     ],
 )

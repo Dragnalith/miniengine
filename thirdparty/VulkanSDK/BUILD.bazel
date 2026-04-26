@@ -1,0 +1,19 @@
+load("@rules_cc//cc:defs.bzl", "cc_import", "cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+cc_import(
+    name = "vulkan_loader",
+    interface_library = "1.4.341.1/Lib/vulkan-1.lib",
+    system_provided = True,
+)
+
+cc_library(
+    name = "vulkan",
+    hdrs = glob([
+        "1.4.341.1/Include/**/*.h",
+        "1.4.341.1/Include/**/*.hpp",
+    ]),
+    includes = ["1.4.341.1/Include"],
+    deps = [":vulkan_loader"],
+)
