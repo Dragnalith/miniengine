@@ -3,7 +3,7 @@
 ## Modules
 
 - `foundation`: layer above the platform; owns the entry point; abstracts window, input, thread, mutex, and similar services; on Windows, owns a dedicated window thread that pulls messages; public headers should not expose platform headers.
-- `rhi`: minimal GPU abstraction over DX12 or Vulkan; exposes only what the rest of the engine needs.
+- `rhi`: minimal GPU abstraction over DX12 or Vulkan; exposes only what the rest of the engine needs. Uses a handle-based API for resources. Textures are always accessed bindlessly.
 - `framework`: defines the frame concept; owns the frame manager; schedules update and rendering work; contains reusable engine systems such as the renderer.
 - `app`: defines application behavior.
 

@@ -7,8 +7,6 @@ struct ImDrawData;
 namespace migi
 {
 
-class RenderDevice;
-class SwapChain;
 class DearImGuiManager;
 struct FrameData;
 
@@ -17,7 +15,7 @@ struct RendererImpl;
 class Renderer
 {
 public:
-	Renderer(RenderDevice& renderDevice, SwapChain& swapChain, DearImGuiManager& manager);
+	Renderer(DearImGuiManager& manager);
 	~Renderer();
 
 	void Render(FrameData& frameData);

@@ -5,8 +5,10 @@
 #include <stdint.h>
 #include <vector>
 
-struct ID3D12CommandAllocator;
-struct ID3D12GraphicsCommandList;
+namespace drgn
+{
+class CommandList;
+}
 
 namespace migi
 {
@@ -27,8 +29,7 @@ struct RenderContext
 {
     int index = -1;
     uint64_t frameIndex = 0xdeadbeef;
-    ID3D12CommandAllocator* CommandAllocator = nullptr;
-    ID3D12GraphicsCommandList* commandList = nullptr;
+    drgn::CommandList* commandList = nullptr;
 };
 
 struct DrawList
@@ -64,8 +65,6 @@ struct FrameData
     bool vsync = true;
     int width = 1280;
     int height = 800;
-    uint32_t backBufferIndex = 0xffffffff;
-    uint32_t debugSwapChainbackBufferIndex = 0xffffffff;
     DrawData drawData;
     RenderContext* renderContext;
     FrameUpdateResult result;

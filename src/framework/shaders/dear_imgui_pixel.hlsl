@@ -1,3 +1,9 @@
+cbuffer DrawConstants : register(b0)
+{
+    row_major float4x4 ProjectionMatrix;
+    uint TextureIndex;
+};
+
 struct PS_INPUT
 {
     float4 pos : SV_POSITION;
@@ -5,10 +11,10 @@ struct PS_INPUT
     float2 uv  : TEXCOORD0;
 };
 
-SamplerState sampler0 : register(s0);
-Texture2D texture0 : register(t0);
+SamplerState TextureSampler : register(s0);
+Texture2D Textures[1024] : register(t2);
 
 float4 main(PS_INPUT input) : SV_Target
 {
-    return input.col * texture0.Sample(sampler0, input.uv);
+    return input.col * Textures[TextureIndex].Sample(TextureSampler, input.uv);
 }

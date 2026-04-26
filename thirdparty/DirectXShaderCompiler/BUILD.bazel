@@ -14,7 +14,7 @@ shader_toolchain(
     name = "dxc_dxil_toolchain_impl",
     compiler = "bin/x64/dxc.exe",
     compiler_files = [":dxc_runtime"],
-    extension = ".dxil",
+    extension = ".shaderb",
     format = "dxil",
 )
 
@@ -23,7 +23,7 @@ shader_toolchain(
     compiler = "bin/x64/dxc.exe",
     compiler_files = [":dxc_runtime"],
     default_copts = ["-spirv"],
-    extension = ".spv",
+    extension = ".shaderb",
     format = "spirv",
 )
 
