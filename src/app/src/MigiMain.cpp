@@ -8,6 +8,7 @@
 
 #include <imgui/imgui.h>
 
+#include <fnd/Log.h>
 #include <fnd/Window.h>
 #include <fnd/MigiMain.h>
 #include <fw/DearImGuiManager.h>
@@ -19,9 +20,14 @@
 
 #include <iostream>
 
+#ifndef DRGN_GPUAPI_NAME
+#error "DRGN_GPUAPI_NAME must be provided by //src/rhi"
+#endif
+
 void MigiMain()
 {
-    migi::WindowSetTitle("MiniEngine App");
+    MIGI_LOG_INFO("MiniEngine app starting (" DRGN_GPUAPI_NAME ")");
+    migi::WindowSetTitle("MiniEngine App (" DRGN_GPUAPI_NAME ")");
 
     migi::DearImGuiManager imguiManager;
     migi::Renderer renderer(imguiManager);
@@ -30,4 +36,5 @@ void MigiMain()
     migi::FrameManager frameManager(pipeline);
 
     frameManager.Start();
+    MIGI_LOG_INFO("MiniEngine app terminating (" DRGN_GPUAPI_NAME ")");
 }

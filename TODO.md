@@ -1,2 +1,3 @@
 - [ ] Support Hidpi screen on Windows
 - [ ] Runner output runtime data to .runtime/<app_name>/<platform>/log file and other runtime data like imgui.ini
+- [ ] Was bazel trigger recompile when switching from Vulkan to DX12?

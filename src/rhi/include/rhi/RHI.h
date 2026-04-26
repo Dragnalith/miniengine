@@ -191,8 +191,8 @@ class RHI
 public:
     virtual ~RHI() = default;
 
-    // Factory: the only concrete backend at the moment is DX12.
-    static std::unique_ptr<RHI> CreateDX12();
+    // Factory for the backend selected at build time.
+    static std::unique_ptr<RHI> Create();
 
     // ---- Resources ----
 

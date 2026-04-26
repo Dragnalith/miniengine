@@ -1,6 +1,7 @@
 """Rules for compiling one HLSL source file into one shader stage blob."""
 
 load("//build/rules:providers.bzl", "AssetSpecInfo", "validate_relative_path")
+load("//build/config:gpuapi.bzl", "GpuApiInfo")
 
 _SHADER_TOOLCHAIN = "//build/rules:shader_toolchain_type"
 
@@ -38,6 +39,8 @@ def _asset_dest(ctx, out):
 
 def _shader_stage_impl(ctx):
     toolchain = ctx.toolchains[_SHADER_TOOLCHAIN].shader
+    gpuapi = ctx.attr._gpuapi[GpuApiInfo].value
+    output_format = "spirv" if gpuapi == "Vulkan" else toolchain.format
 
     if ctx.attr.out:
         validate_relative_path(ctx.attr.out, "shader output")
@@ -49,6 +52,17 @@ def _shader_stage_impl(ctx):
     args = ctx.actions.args()
     args.add("-nologo")
     args.add_all(toolchain.default_copts)
+    if gpuapi == "Vulkan":
+        args.add("-spirv")
+        args.add("-fvk-use-dx-layout")
+        args.add_all([
+            "-fvk-bind-register", "b0", "0", "0", "0",
+            "-fvk-bind-register", "b1", "0", "1", "0",
+            "-fvk-bind-register", "t0", "0", "2", "0",
+            "-fvk-bind-register", "t1", "0", "3", "0",
+            "-fvk-bind-register", "s0", "0", "0", "1",
+            "-fvk-bind-register", "t2", "0", "1", "1",
+        ])
     args.add("-E", ctx.attr.entry)
     args.add("-T", _profile(ctx.attr.stage, ctx.attr.shader_model))
     args.add("-Fo", out)
@@ -68,7 +82,7 @@ def _shader_stage_impl(ctx):
         progress_message = "Compiling %s shader %s to %s" % (
             ctx.attr.stage,
             ctx.file.src.short_path,
-            toolchain.format.upper(),
+            output_format.upper(),
         ),
     )
 
@@ -80,7 +94,7 @@ def _shader_stage_impl(ctx):
         ShaderStageInfo(
             entry = ctx.attr.entry,
             file = out,
-            format = toolchain.format,
+            format = output_format,
             stage = ctx.attr.stage,
         ),
         AssetSpecInfo(entries = depset([
@@ -105,6 +119,9 @@ shader_stage = rule(
         "stage": attr.string(
             mandatory = True,
             values = ["vertex", "pixel"],
+        ),
+        "_gpuapi": attr.label(
+            default = Label("//build/config:gpuapi"),
         ),
     },
     toolchains = [_SHADER_TOOLCHAIN],

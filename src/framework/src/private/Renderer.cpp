@@ -25,7 +25,7 @@ struct RendererImpl
     static constexpr int NUM_FRAMES_IN_FLIGHT = 8;
 
     RendererImpl(DearImGuiManager& manager)
-        : rhi(drgn::RHI::CreateDX12())
+        : rhi(drgn::RHI::Create())
         , imguiRenderer(*rhi, manager)
     {
         Int2 windowSize = WindowGetSize();
