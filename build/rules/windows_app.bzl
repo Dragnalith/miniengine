@@ -14,28 +14,11 @@ def _binary_name_without_exe(exe):
         fail("windows_app binary executable must end with .exe: %s" % exe.short_path)
     return exe.basename[:-4]
 
-def _dirname(path):
-    slash = path.rfind("/")
-    if slash < 0:
-        return ""
-    return path[:slash]
-
-def _shell_quote(value):
-    return "'" + value.replace("'", "'\\''") + "'"
-
 def _copy_file(ctx, src, out):
-    out_dir = _dirname(out.path)
-    commands = []
-    if out_dir:
-        commands.append("mkdir -p %s" % _shell_quote(out_dir))
-    commands.append("cp -f %s %s" % (_shell_quote(src.path), _shell_quote(out.path)))
-
-    ctx.actions.run_shell(
-        inputs = [src],
-        outputs = [out],
-        command = "\n".join(commands),
-        mnemonic = "WindowsAppCopy",
-        progress_message = "Copying %s to %s" % (src.short_path, out.short_path),
+    ctx.actions.symlink(
+        output = out,
+        target_file = src,
+        progress_message = "Bundling %s as %s" % (src.short_path, out.short_path),
     )
 
 def _output_group_files(target, name):
