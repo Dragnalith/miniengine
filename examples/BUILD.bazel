@@ -1,0 +1,2 @@
+# Each example owns its own platform-dispatching alias (e.g.
+# //examples/hello_world). This package intentionally defines no targets.

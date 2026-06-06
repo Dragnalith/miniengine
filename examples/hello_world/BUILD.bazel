@@ -11,7 +11,7 @@ cc_library(
 
 # Desktop (Windows) executable.
 cc_binary(
-    name = "hello_world",
+    name = "hello_world_exe",
     deps = [":hello_world_lib"],
 )
 
@@ -27,4 +27,16 @@ android_apk(
     default_emulator = ":emulator",
     manifest = "AndroidManifest.xml",
     deps = [":hello_world_lib"],
+)
+
+# Platform-dispatching entry point:
+#   bazel run //examples/hello_world                         (desktop executable)
+#   bazel run //examples/hello_world --platforms=//:android  (Android APK)
+alias(
+    name = "hello_world",
+    actual = select({
+        "@platforms//os:android": ":hello_world_apk",
+        "//conditions:default": ":hello_world_exe",
+    }),
+    visibility = ["//visibility:public"],
 )

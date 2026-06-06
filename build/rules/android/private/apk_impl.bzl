@@ -47,6 +47,22 @@ _android_split_transition = transition(
     outputs = ["//command_line_option:platforms"],
 )
 
+def _reset_to_host_transition_impl(settings, _attr):
+    # The APK is a host-side artifact: java (apksigner), python (the run/launch
+    # script) and the SDK build-tools are host tools, yet they are required as
+    # toolchains resolved against this target's platform. Pin the apk's own
+    # platform to the host so those toolchains resolve even when the apk is
+    # requested under `--platforms=//:android`. The native libraries are
+    # unaffected -- they are produced by the `deps` split transition over
+    # `--android_platforms` and keep targeting Android.
+    return {"//command_line_option:platforms": str(settings["//command_line_option:host_platform"])}
+
+_reset_to_host_transition = transition(
+    implementation = _reset_to_host_transition_impl,
+    inputs = ["//command_line_option:host_platform"],
+    outputs = ["//command_line_option:platforms"],
+)
+
 def _link_shared(ctx, key, abi, deps):
     cc_toolchain = ctx.split_attr._cc_toolchain[key][cc_common.CcToolchainInfo]
     feature_config = cc_common.configure_features(
@@ -270,6 +286,7 @@ def _android_apk_impl(ctx):
 
 android_apk = rule(
     implementation = _android_apk_impl,
+    cfg = _reset_to_host_transition,
     attrs = {
         "manifest": attr.label(
             allow_single_file = True,
