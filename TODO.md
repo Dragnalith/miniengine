@@ -1,3 +1,9 @@
-- [ ] Support Hidpi screen on Windows
+- [X] Was bazel trigger recompile when switching from Vulkan to DX12? Yes
+- [X] Android: Add a hello world examples which is not interactive. It just logs "Hello World" to the console.
+- [ ] Android: Add a job system example which is not interactive. It spawns a few nested jobs and wait for them to finish.
+- [ ] Android: Port framework module to Android and make //example/hello_world on Android.
+- [ ] Android: Make //examples/job_system example work on Android
+- [ ] Android: Make //examples/triangle work on Android
+- [ ] Android: Make //src/app work on Android
 - [ ] Runner output runtime data to .runtime/<app_name>/<platform>/log file and other runtime data like imgui.ini
-- [ ] Was bazel trigger recompile when switching from Vulkan to DX12?
+- [ ] Support Hidpi screen on Windows
