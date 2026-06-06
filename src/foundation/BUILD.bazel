@@ -1,25 +1,85 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
 
+# Public, platform-agnostic API headers (included as <fnd/...>).
+cc_library(
+    name = "foundation_api",
+    hdrs = glob(["include/fnd/*.h"]),
+    strip_include_prefix = "include",
+    visibility = ["//visibility:public"],
+)
+
+# Private headers shared by every platform backend (included as <private/...>).
 cc_library(
     name = "_private_includes",
+    hdrs = glob(["src/private/**/*.h"]),
     includes = ["src"],
+    visibility = ["//visibility:private"],
+)
+
+# Platform-agnostic implementation, shared by all backends.
+cc_library(
+    name = "foundation_common",
+    srcs = glob(["src/private/**/*.cpp"]),
+    implementation_deps = [":_private_includes"],
+    visibility = ["//visibility:private"],
+    deps = [":foundation_api"],
+)
+
+# Win32 backend: Win32 window, fiber job system, console entry point.
+cc_library(
+    name = "foundation_windows",
+    srcs = glob([
+        "src/Windows/private/**/*.cpp",
+        "src/Windows/private/**/*.h",
+    ], allow_empty = True),
+    implementation_deps = [":_private_includes"],
+    target_compatible_with = ["@platforms//os:windows"],
+    visibility = ["//visibility:private"],
+    deps = [
+        ":foundation_api",
+        "@msvc_toolchains//lib:kernel32",
+        "@msvc_toolchains//lib:user32",
+    ],
+)
+
+# Android backend: NativeActivity entry point via android_native_app_glue.
+cc_library(
+    name = "foundation_android",
+    srcs = glob([
+        "src/Android/private/**/*.cpp",
+        "src/Android/private/**/*.h",
+    ], allow_empty = True),
+    implementation_deps = [":_private_includes"],
+    linkopts = [
+        "-u",
+        "ANativeActivity_onCreate",
+        "-landroid",
+        "-llog",
+    ],
+    alwayslink = True,
+    target_compatible_with = ["@platforms//os:android"],
+    visibility = ["//visibility:private"],
+    deps = [
+        ":foundation_api",
+        "@android_ndk//:native_app_glue",
+    ],
+)
+
+alias(
+    name = "selected_foundation_backend",
+    actual = select({
+        "@platforms//os:android": ":foundation_android",
+        "//conditions:default": ":foundation_windows",
+    }),
     visibility = ["//visibility:private"],
 )
 
 cc_library(
     name = "foundation",
-    srcs = glob([
-        "src/private/**/*.cpp",
-        "src/private/**/*.h",
-    ]),
-    hdrs = glob(["include/fnd/*.h"]),
-    implementation_deps = [
-        "_private_includes",
-    ],
-    strip_include_prefix = "include",
     visibility = ["//visibility:public"],
     deps = [
-        "@msvc_toolchains//lib:kernel32",
-        "@msvc_toolchains//lib:user32",
+        ":foundation_api",
+        ":foundation_common",
+        ":selected_foundation_backend",
     ],
 )

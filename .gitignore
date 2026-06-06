@@ -3,3 +3,4 @@ MODULE.bazel.lock
 imgui.ini
 user.bazelrc
 .mado
+.android_emulators

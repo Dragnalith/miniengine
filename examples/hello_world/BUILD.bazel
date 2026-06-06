@@ -1,9 +1,30 @@
-load("@rules_cc//cc:defs.bzl", "cc_binary")
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
+load("//build/rules/android:apk.bzl", "android_apk")
+load("//build/rules/android:emulator.bzl", "android_emulator")
 
+cc_library(
+    name = "hello_world_lib",
+    srcs = ["HelloWorldExample.cpp"],
+    alwayslink = True,
+    deps = ["//src/foundation"],
+)
+
+# Desktop (Windows) executable.
 cc_binary(
     name = "hello_world",
-    srcs = ["HelloWorldExample.cpp"],
-    deps = [
-        "//src/foundation",
-    ],
+    deps = [":hello_world_lib"],
+)
+
+android_emulator(
+    name = "emulator",
+)
+
+# Android APK. The packaged native library is lib<name>.so, so the target name
+# must match android.app.lib_name in AndroidManifest.xml ("hello_world_apk").
+android_apk(
+    name = "hello_world_apk",
+    custom_package = "com.example.helloworld",
+    default_emulator = ":emulator",
+    manifest = "AndroidManifest.xml",
+    deps = [":hello_world_lib"],
 )

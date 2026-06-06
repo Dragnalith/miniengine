@@ -1,5 +1,8 @@
 bazel_dep(name = "rules_cc", version = "0.2.17")
 bazel_dep(name = "platforms", version = "1.0.0")
+bazel_dep(name = "bazel_skylib", version = "1.9.0")
+bazel_dep(name = "rules_java", version = "9.6.1")
+bazel_dep(name = "rules_python", version = "2.0.0-rc3")
 bazel_dep(name = "toolchains_msvc", version = "0.1.0")
 git_override(
     module_name = "toolchains_msvc",
@@ -25,4 +28,68 @@ register_toolchains("@msvc_toolchains//:all")
 register_toolchains(
     "//thirdparty/DirectXShaderCompiler:dxc_dxil_toolchain",
     "//thirdparty/DirectXShaderCompiler:dxc_spirv_toolchain",
+)
+
+# ---------------------------------------------------------------------------
+# Android
+# ---------------------------------------------------------------------------
+#
+# Hermetic Android SDK/NDK fetch and NDK cc_toolchains, ported from the
+# minimal_android_vulkan research project (custom rules under //build/rules/android,
+# not rules_android). Shaders keep using the DXC -> SPIR-V toolchain above.
+
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(
+    is_default = True,
+    python_version = "3.12",
+)
+
+java_repository = use_extension("@rules_java//java:extensions.bzl", "java_repository")
+java_repository.remote(
+    name = "remote_jdk",
+    sha256 = "45a44af1f832e720ea6ad90dd7b2c94a48b2e5bf2fab92b2403e975f78d7d5e1",
+    strip_prefix = "jdk-21.0.10+7",
+    target_compatible_with = [
+        "@platforms//os:windows",
+        "@platforms//cpu:x86_64",
+    ],
+    urls = ["https://aka.ms/download-jdk/microsoft-jdk-21-windows-x64.zip"],
+    version = "21",
+)
+use_repo(
+    java_repository,
+    "remote_jdk",
+    "remote_jdk_toolchain_config_repo",
+)
+
+register_toolchains("@remote_jdk_toolchain_config_repo//:all")
+
+android = use_extension("//build/rules/android:extensions.bzl", "android")
+
+# emulator/system_image are pinned to specific reviewed archives in
+# build/rules/android/private/google_repo.bzl. Google bumps the singleton "emulator"
+# package in place and de-lists the old archive from its manifest, but the file
+# stays downloadable and the rules seed their index from the pinned allowlist,
+# so these resolve regardless of upstream "latest" drift.
+android.configure(
+    build_tools = "36.1.0",
+    cmdline_tools = "latest",
+    emulator = "latest",
+    min_api = "24",
+    ndk = "29.0.14206865",
+    platform_tools = "latest",
+    platform_version = "36",
+    system_image = "android-36;google_apis;x86_64",
+)
+use_repo(
+    android,
+    "android_ndk",
+    "android_ndk_toolchains",
+    "android_sdk",
+    "android_sdk_toolchains",
+)
+
+register_toolchains(
+    "@android_sdk_toolchains//:sdk_toolchain",
+    "@android_ndk_toolchains//:all",
 )

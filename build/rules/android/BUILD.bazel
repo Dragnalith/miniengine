@@ -1,0 +1,17 @@
+load(":adb.bzl", "adb")
+
+package(default_visibility = ["//visibility:public"])
+
+# The Android SDK toolchain type. Kept here (not in the generated
+# @android_sdk_toolchains repo) so the label is stable and consumers —
+# including rule implementations in //build/rules/android/private — can reference
+# it the way they would the public toolchain type of any bazel_dep module.
+#
+# The matching instance + `toolchain()` registration is emitted by
+# `@android_sdk_toolchains`; the rule + provider live at
+# //build/rules/android:sdk_toolchain.bzl.
+toolchain_type(name = "sdk_toolchain_type")
+
+# Stable entry point for `bazel run //build/rules/android:adb -- <args>` — proxies
+# through to the adb.exe shipped with @android_sdk's platform-tools.
+adb(name = "adb")

@@ -1,0 +1,29 @@
+package(default_visibility = ["//build/rules/android:__subpackages__"])
+
+# Shared debug keystore used by default for every android_apk.
+# Checked in on purpose — regenerating per build produces a fresh RSA keypair,
+# which makes `adb install -r` fail with INSTALL_FAILED_UPDATE_INCOMPATIBLE
+# against any previously-installed APK. rules_android does the same thing.
+filegroup(
+    name = "debug_key",
+    srcs = ["debug.keystore"],
+    visibility = ["//visibility:public"],
+)
+
+# Minimal stub classes.dex. Android's PackageManager rejects any APK whose
+# manifest declares a launchable component and that has no classes.dex
+# ("Scanning Failed.: Package base.apk code is missing"), even when the only
+# activity is NativeActivity. Ship a one-time-generated empty DEX — same trick
+# rules_android plays with its DexPlaceholder, minus the javac/d8 build step.
+filegroup(
+    name = "stub_dex",
+    srcs = ["classes.dex"],
+    visibility = ["//visibility:public"],
+)
+
+# Python templates expanded by the Android runner rules.
+exports_files([
+    "adb_runner.py.tpl",
+    "apk_runner.py.tpl",
+    "emulator_runner.py.tpl",
+])
