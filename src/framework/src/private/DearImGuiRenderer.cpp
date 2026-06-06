@@ -1,6 +1,7 @@
 #include <private/DearImGuiRenderer.h>
 
 #include <fnd/Assert.h>
+#include <fnd/FileSystem.h>
 #include <rhi/RHI.h>
 
 #include <imgui/imgui.h>
@@ -10,7 +11,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <fstream>
 #include <span>
 #include <vector>
 
@@ -40,24 +40,6 @@ struct FrameResources
     uint32_t indexCapacity = 0;
     uint32_t constantCapacity = 0;
 };
-
-std::vector<std::byte> LoadBundledFile(const char* relativePath)
-{
-    std::ifstream file(relativePath, std::ios::binary | std::ios::ate);
-    MIGI_ASSERT(file.is_open(), "Cannot open bundled file");
-
-    const std::ifstream::pos_type end = file.tellg();
-    MIGI_ASSERT(end >= 0, "Cannot determine bundled file size");
-
-    std::vector<std::byte> bytes(static_cast<size_t>(end));
-    file.seekg(0, std::ios::beg);
-    if (!bytes.empty())
-    {
-        file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
-        MIGI_ASSERT(file.good(), "Cannot read bundled file");
-    }
-    return bytes;
-}
 
 drgn::TextureIndex TextureIndexFromImGui(ImTextureID textureId)
 {
@@ -118,8 +100,8 @@ struct DearImGuiRendererImpl
 DearImGuiRenderer::DearImGuiRenderer(drgn::RHI& rhi, DearImGuiManager&)
     : m_impl(rhi)
 {
-    std::vector<std::byte> vertexShader = LoadBundledFile("assets/shaders/dear_imgui_vertex.shaderb");
-    std::vector<std::byte> pixelShader = LoadBundledFile("assets/shaders/dear_imgui_pixel.shaderb");
+    std::vector<std::byte> vertexShader = migi::ReadFile("shaders/dear_imgui_vertex.shaderb");
+    std::vector<std::byte> pixelShader = migi::ReadFile("shaders/dear_imgui_pixel.shaderb");
 
     drgn::ShaderPipelineDesc pipelineDesc{};
     pipelineDesc.vertexShader = std::span<const std::byte>(vertexShader.data(), vertexShader.size());

@@ -4,6 +4,6 @@
 - [X] Android: Port framework module to Android and make //example/hello_world on Android.
 - [X] Android: Make //examples/job_system example work on Android
 - [X] Android: Make //examples/triangle work on Android
-- [ ] Android: Make //src/app work on Android
+- [X] Android: Make //src/app work on Android
 - [ ] Runner output runtime data to .runtime/<app_name>/<platform>/log file and other runtime data like imgui.ini
 - [ ] Support Hidpi screen on Windows

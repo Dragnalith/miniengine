@@ -26,22 +26,30 @@ cc_library(
     deps = [
         "//src/foundation",
         "//src/rhi",
-        "@msvc_toolchains//lib:imm32",
-        "@msvc_toolchains//lib:kernel32",
-        "@msvc_toolchains//lib:user32",
-    ],
+    ] + select({
+        # The Win32 deps back imgui's native clipboard/IME path, which is
+        # guarded by `_WIN32` and not compiled on Android.
+        "@platforms//os:android": [],
+        "//conditions:default": [
+            "@msvc_toolchains//lib:imm32",
+            "@msvc_toolchains//lib:kernel32",
+            "@msvc_toolchains//lib:user32",
+        ],
+    }),
 )
 
 shader_stage(
     name = "dear_imgui_vertex",
     src = "shaders/dear_imgui_vertex.hlsl",
     stage = "vertex",
+    visibility = ["//visibility:public"],
 )
 
 shader_stage(
     name = "dear_imgui_pixel",
     src = "shaders/dear_imgui_pixel.hlsl",
     stage = "pixel",
+    visibility = ["//visibility:public"],
 )
 
 asset_group(
