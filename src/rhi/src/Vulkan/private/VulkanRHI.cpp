@@ -3,13 +3,23 @@
 #include <fnd/Assert.h>
 #include <fnd/Log.h>
 
+#if defined(__ANDROID__)
+#define VK_USE_PLATFORM_ANDROID_KHR
+#elif defined(_WIN32)
 #define VK_USE_PLATFORM_WIN32_KHR
+#endif
 #include <vulkan/vulkan.h>
 
+#if defined(__ANDROID__)
+#include <android/native_window.h>
+#elif defined(_WIN32)
 #include <windows.h>
+#endif
 
 #include <algorithm>
 #include <array>
+#include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -18,6 +28,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -31,8 +42,19 @@ constexpr uint32_t kMaxBindlessTextures = 1024;
 constexpr uint32_t kDefaultBackBufferCount = 2;
 constexpr uint32_t kMaxDrawsPerCommandList = 8192;
 constexpr uint32_t kDrawConstantsSize = 256;
-constexpr DWORD kAcquireRetrySleepMs = 1;
-constexpr VkFormat kSwapChainFormat = VK_FORMAT_B8G8R8A8_UNORM;
+constexpr uint32_t kAcquireRetrySleepMs = 1;
+// Spacing between successive synthetic buffer addresses. Each buffer is given a
+// unique address range [base, base + AlignUp(byteSize, kBufferAddressGranularity));
+// the granularity keeps ranges non-overlapping while staying byte-addressable.
+constexpr uint64_t kBufferAddressGranularity = 256;
+constexpr VkFormat kSwapChainFormat =
+#if defined(__ANDROID__)
+    // Android/gfxstream surfaces expose RGBA8 as the native swapchain format;
+    // BGRA8 is generally not advertised there.
+    VK_FORMAT_R8G8B8A8_UNORM;
+#else
+    VK_FORMAT_B8G8R8A8_UNORM;
+#endif
 
 VkFormat ToVkFormat(Format format)
 {
@@ -316,6 +338,11 @@ private:
     VkDescriptorSet m_bindlessSet = VK_NULL_HANDLE;
     TextureRecord m_fallbackTexture;
     VkDeviceSize m_uniformBufferAlignment = 256;
+    // Buffers are addressed by a synthetic, non-overlapping GPU address used
+    // purely as a lookup key (see FindBufferSlice); shaders bind buffers as
+    // descriptors rather than dereferencing the address, so the backend does
+    // not require the bufferDeviceAddress feature (absent on e.g. SwiftShader).
+    std::atomic<uint64_t> m_nextBufferAddress{kBufferAddressGranularity};
     std::mutex m_vulkanMutex;
 
     std::vector<BufferRecord> m_buffers;
@@ -432,7 +459,11 @@ void VulkanRHI::CreateInstance()
 
     const std::array<const char*, 2> extensions = {
         VK_KHR_SURFACE_EXTENSION_NAME,
+#if defined(__ANDROID__)
+        VK_KHR_ANDROID_SURFACE_EXTENSION_NAME,
+#else
         VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
+#endif
     };
 
     VkInstanceCreateInfo createInfo = {};
@@ -458,6 +489,14 @@ void VulkanRHI::PickPhysicalDevice()
         VkPhysicalDeviceProperties properties = {};
         vkGetPhysicalDeviceProperties(device, &properties);
 
+        char message[256] = {};
+        std::snprintf(message, sizeof(message), "Considering Vulkan device '%s' (apiVersion %u.%u.%u)",
+            properties.deviceName,
+            VK_API_VERSION_MAJOR(properties.apiVersion),
+            VK_API_VERSION_MINOR(properties.apiVersion),
+            VK_API_VERSION_PATCH(properties.apiVersion));
+        MIGI_LOG_INFO(message);
+
         uint32_t queueFamilyCount = 0;
         vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
         std::vector<VkQueueFamilyProperties> families(queueFamilyCount);
@@ -473,28 +512,31 @@ void VulkanRHI::PickPhysicalDevice()
             }
         }
         if (!graphicsFamily.has_value())
+        {
+            MIGI_LOG_WARNING("  rejected: no graphics queue family");
             continue;
+        }
 
         uint32_t extensionCount = 0;
         CheckVk(vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr), "Vulkan device extension enumeration failed");
         std::vector<VkExtensionProperties> extensions(extensionCount);
         CheckVk(vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, extensions.data()), "Vulkan device extension enumeration failed");
         if (!HasExtension(extensions, VK_KHR_SWAPCHAIN_EXTENSION_NAME))
+        {
+            MIGI_LOG_WARNING("  rejected: no VK_KHR_swapchain");
             continue;
+        }
 
-        VkPhysicalDeviceBufferDeviceAddressFeatures addressFeatures = {};
-        addressFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
-
-        VkPhysicalDeviceFeatures2 features = {};
-        features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-        features.pNext = &addressFeatures;
-        vkGetPhysicalDeviceFeatures2(device, &features);
-        if (!addressFeatures.bufferDeviceAddress)
-            continue;
-
+        std::snprintf(message, sizeof(message),
+            "  limits: maxPerStageDescriptorSampledImages=%u maxDescriptorSetSampledImages=%u (need %u)",
+            properties.limits.maxPerStageDescriptorSampledImages,
+            properties.limits.maxDescriptorSetSampledImages,
+            kMaxBindlessTextures);
+        MIGI_LOG_INFO(message);
         if (properties.limits.maxPerStageDescriptorSampledImages < kMaxBindlessTextures ||
             properties.limits.maxDescriptorSetSampledImages < kMaxBindlessTextures)
         {
+            MIGI_LOG_WARNING("  rejected: insufficient bindless sampled image limits");
             continue;
         }
 
@@ -518,8 +560,6 @@ void VulkanRHI::CreateDevice()
     std::vector<const char*> extensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
     };
-    if (HasExtension(availableExtensions, VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME))
-        extensions.push_back(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
 
     const float queuePriority = 1.0f;
     VkDeviceQueueCreateInfo queueInfo = {};
@@ -528,13 +568,8 @@ void VulkanRHI::CreateDevice()
     queueInfo.queueCount = 1;
     queueInfo.pQueuePriorities = &queuePriority;
 
-    VkPhysicalDeviceBufferDeviceAddressFeatures addressFeatures = {};
-    addressFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
-    addressFeatures.bufferDeviceAddress = VK_TRUE;
-
     VkDeviceCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    createInfo.pNext = &addressFeatures;
     createInfo.queueCreateInfoCount = 1;
     createInfo.pQueueCreateInfos = &queueInfo;
     createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
@@ -745,13 +780,8 @@ VulkanRHI::BufferResource VulkanRHI::CreateBufferResource(
     VkMemoryRequirements requirements = {};
     vkGetBufferMemoryRequirements(m_device, resource.buffer, &requirements);
 
-    VkMemoryAllocateFlagsInfo flagsInfo = {};
-    flagsInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO;
-    flagsInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
-
     VkMemoryAllocateInfo allocInfo = {};
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.pNext = (usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) != 0 ? &flagsInfo : nullptr;
     allocInfo.allocationSize = requirements.size;
     allocInfo.memoryTypeIndex = FindMemoryType(requirements.memoryTypeBits, memoryProperties);
     CheckVk(vkAllocateMemory(m_device, &allocInfo, nullptr, &resource.memory), "Vulkan buffer memory allocation failed");
@@ -760,14 +790,11 @@ VulkanRHI::BufferResource VulkanRHI::CreateBufferResource(
     if (mapped)
         CheckVk(vkMapMemory(m_device, resource.memory, 0, byteSize, 0, &resource.mapped), "Vulkan buffer map failed");
 
-    if ((usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) != 0)
-    {
-        VkBufferDeviceAddressInfo addressInfo = {};
-        addressInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
-        addressInfo.buffer = resource.buffer;
-        resource.address = vkGetBufferDeviceAddress(m_device, &addressInfo);
-        MIGI_ASSERT(resource.address != 0, "Vulkan buffer device address lookup failed");
-    }
+    // Hand out a unique, non-overlapping synthetic address range for this
+    // buffer. It is only ever used as a key to recover the VkBuffer in
+    // FindBufferSlice, never dereferenced on the GPU.
+    const uint64_t span = AlignUp(byteSize, kBufferAddressGranularity);
+    resource.address = m_nextBufferAddress.fetch_add(span);
 
     return resource;
 }
@@ -1143,8 +1170,7 @@ BufferHandle VulkanRHI::CreateBuffer(const BufferDesc& desc)
     record.resource = CreateBufferResource(
         desc.byteSize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
-            VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         true);
 
@@ -1424,11 +1450,18 @@ SwapChainHandle VulkanRHI::CreateSwapChain(const SwapChainDesc& desc)
     record.bufferCount = desc.bufferCount != 0 ? desc.bufferCount : kDefaultBackBufferCount;
     record.fullscreen = desc.fullscreen;
 
+#if defined(__ANDROID__)
+    VkAndroidSurfaceCreateInfoKHR surfaceInfo = {};
+    surfaceInfo.sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR;
+    surfaceInfo.window = static_cast<ANativeWindow*>(desc.windowHandle);
+    CheckVk(vkCreateAndroidSurfaceKHR(m_instance, &surfaceInfo, nullptr, &record.surface), "Vulkan Android surface creation failed");
+#else
     VkWin32SurfaceCreateInfoKHR surfaceInfo = {};
     surfaceInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
     surfaceInfo.hinstance = GetModuleHandleA(nullptr);
     surfaceInfo.hwnd = static_cast<HWND>(desc.windowHandle);
     CheckVk(vkCreateWin32SurfaceKHR(m_instance, &surfaceInfo, nullptr, &record.surface), "Vulkan Win32 surface creation failed");
+#endif
 
     CreateSwapChainObjects(record, std::max(desc.width, 1u), std::max(desc.height, 1u));
     return handle;
@@ -1780,7 +1813,7 @@ void VulkanRHI::VulkanCommandList::BeginRenderPass(SwapChainHandle target, const
                     &activeImageIndex);
             }
             if (IsAcquireWaitResult(result))
-                ::Sleep(kAcquireRetrySleepMs);
+                std::this_thread::sleep_for(std::chrono::milliseconds(kAcquireRetrySleepMs));
         } while (IsAcquireWaitResult(result));
 
         return result;

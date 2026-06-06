@@ -1,16 +1,17 @@
-load("@rules_cc//cc:defs.bzl", "cc_binary")
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
 load("//build/rules:asset_group.bzl", "asset_group")
 load("//build/rules:shader.bzl", "shader_stage")
 load("//build/rules:windows_app.bzl", "windows_app")
+load("//build/rules/android:apk.bzl", "android_apk")
+load("//build/rules/android:emulator.bzl", "android_emulator")
 
-cc_binary(
-    name = "triangle_binary",
+cc_library(
+    name = "triangle_lib",
     srcs = ["TriangleExample.cpp"],
+    alwayslink = True,
     deps = [
         "//src/foundation",
         "//src/rhi",
-        "@msvc_toolchains//lib:kernel32",
-        "@msvc_toolchains//lib:user32",
     ],
 )
 
@@ -34,8 +35,50 @@ asset_group(
     ],
 )
 
+# Desktop (Windows) executable + bundle.
+cc_binary(
+    name = "triangle_exe",
+    deps = [":triangle_lib"],
+)
+
 windows_app(
-    name = "triangle",
+    name = "triangle_app",
     assets = ":assets",
-    binary = ":triangle_binary",
+    binary = ":triangle_exe",
+)
+
+# The triangle renders through the bindless Vulkan RHI, which needs a capable
+# Vulkan device. The software SwiftShader renderer caps sampled images far below
+# what the RHI requires, so this emulator runs on the host GPU (gfxstream).
+android_emulator(
+    name = "emulator",
+    gpu = "host",
+)
+
+# Android APK. The packaged native library is lib<name>.so, so the target name
+# must match android.app.lib_name in AndroidManifest.xml ("triangle_apk"). The
+# compiled shaders are SPIR-V (the APK build pins gpuapi=Vulkan) and are bundled
+# as assets, loaded at runtime through the AAssetManager.
+android_apk(
+    name = "triangle_apk",
+    custom_package = "com.example.triangle",
+    default_emulator = ":emulator",
+    manifest = "AndroidManifest.xml",
+    assets = [
+        ":triangle_pixel",
+        ":triangle_vertex",
+    ],
+    deps = [":triangle_lib"],
+)
+
+# Platform-dispatching entry point:
+#   bazel run //examples/triangle                         (desktop bundle)
+#   bazel run //examples/triangle --platforms=//:android  (Android APK)
+alias(
+    name = "triangle",
+    actual = select({
+        "@platforms//os:android": ":triangle_apk",
+        "//conditions:default": ":triangle_app",
+    }),
+    visibility = ["//visibility:public"],
 )

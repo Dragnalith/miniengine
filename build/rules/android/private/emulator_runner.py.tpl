@@ -14,6 +14,7 @@ AVDMANAGER_RLOCATION = __AVDMANAGER_RLOCATION__
 JAVA_RLOCATION = __JAVA_RLOCATION__
 SYSTEM_IMAGE = __SYSTEM_IMAGE__
 AVD_NAME = __AVD_NAME__
+GPU_MODE = __GPU_MODE__
 
 BOOT_TIMEOUT_SEC = 60
 SHUTDOWN_TIMEOUT_SEC = 60
@@ -353,7 +354,7 @@ def spawn_emulator_detached(cfg, port):
         "-no-audio",
         "-no-boot-anim",
         "-gpu",
-        "swiftshader_indirect",
+        GPU_MODE,
     ]
 
     if os.name != "nt":
@@ -373,8 +374,8 @@ def spawn_emulator_detached(cfg, port):
     )
     emulator_cmd = (
         '"%s" -avd %s -sysdir "%s" -port %d -no-snapshot-save -no-audio '
-        '-no-boot-anim -gpu swiftshader_indirect > "%s" 2>&1'
-        % (cfg.emulator_exe, cfg.avd_name, cfg.sysdir, port, cfg.log_path)
+        '-no-boot-anim -gpu %s > "%s" 2>&1'
+        % (cfg.emulator_exe, cfg.avd_name, cfg.sysdir, port, GPU_MODE, cfg.log_path)
     )
     target = "cmd.exe /d /c " + env_setters + " & " + emulator_cmd
     ps_script = (

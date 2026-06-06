@@ -42,6 +42,7 @@ def _android_emulator_impl(ctx):
             "__JAVA_RLOCATION__": _py_string(rlocation_path(java_exe)),
             "__SYSTEM_IMAGE__": _py_string(ctx.attr.system_image),
             "__AVD_NAME__": _py_string(ctx.label.name),
+            "__GPU_MODE__": _py_string(ctx.attr.gpu),
         },
         is_executable = True,
     )
@@ -85,6 +86,12 @@ android_emulator = rule(
         "system_image": attr.string(
             default = "system-images;android-36;google_apis;x86_64",
             doc = "SDK system image package spec used to create the AVD.",
+        ),
+        "gpu": attr.string(
+            default = "swiftshader_indirect",
+            doc = "Emulator -gpu mode. The default software renderer suits " +
+                  "non-graphical apps; graphical apps that need a capable " +
+                  "Vulkan device (e.g. bindless rendering) should use \"host\".",
         ),
         "_emulator_runner_template": attr.label(
             allow_single_file = True,

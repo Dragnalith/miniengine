@@ -1,4 +1,4 @@
-#include <fnd/Assert.h>
+#include <fnd/FileSystem.h>
 #include <fnd/MigiMain.h>
 #include <fnd/PrimitiveTypes.h>
 #include <fnd/Window.h>
@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <fstream>
 #include <memory>
 #include <span>
 #include <thread>
@@ -31,23 +30,10 @@ constexpr Vertex kVertices[] =
 
 constexpr uint16_t kIndices[] = { 0, 1, 2 };
 
-std::vector<std::byte> LoadBundledFile(const char* relativePath)
-{
-    std::ifstream file(relativePath, std::ios::binary | std::ios::ate);
-    MIGI_ASSERT(file.is_open(), "Cannot open bundled file");
-
-    const std::ifstream::pos_type end = file.tellg();
-    MIGI_ASSERT(end >= 0, "Cannot determine bundled file size");
-
-    std::vector<std::byte> bytes(static_cast<size_t>(end));
-    file.seekg(0, std::ios::beg);
-    if (!bytes.empty())
-    {
-        file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
-        MIGI_ASSERT(file.good(), "Cannot read bundled file");
-    }
-    return bytes;
-}
+// The RHI binds per-draw "user data" (HLSL register b0) at a fixed slot for
+// every draw. This triangle's vertex shader does not read it, but the backend
+// still requires a valid buffer, so a small zero-initialized one is supplied.
+constexpr uint32_t kUserDataByteSize = 256;
 
 } // namespace
 
@@ -55,7 +41,7 @@ void MigiMain()
 {
     migi::WindowSetTitle("Triangle Example");
 
-    std::unique_ptr<drgn::RHI> rhi = drgn::RHI::CreateDX12();
+    std::unique_ptr<drgn::RHI> rhi = drgn::RHI::Create();
 
     migi::Int2 windowSize = migi::WindowGetSize();
     uint32_t width = static_cast<uint32_t>(std::max(windowSize.x, 1));
@@ -77,8 +63,14 @@ void MigiMain()
     indexBufferDesc.initialData = kIndices;
     drgn::BufferHandle indexBuffer = rhi->CreateBuffer(indexBufferDesc);
 
-    std::vector<std::byte> vertexShader = LoadBundledFile("assets/shaders/triangle_vertex.shaderb");
-    std::vector<std::byte> pixelShader = LoadBundledFile("assets/shaders/triangle_pixel.shaderb");
+    const std::byte userDataInit[kUserDataByteSize] = {};
+    drgn::BufferDesc userDataBufferDesc{};
+    userDataBufferDesc.byteSize = kUserDataByteSize;
+    userDataBufferDesc.initialData = userDataInit;
+    drgn::BufferHandle userDataBuffer = rhi->CreateBuffer(userDataBufferDesc);
+
+    std::vector<std::byte> vertexShader = migi::ReadFile("shaders/triangle_vertex.shaderb");
+    std::vector<std::byte> pixelShader = migi::ReadFile("shaders/triangle_pixel.shaderb");
     drgn::ShaderPipelineDesc pipelineDesc{};
     pipelineDesc.vertexShader = std::span<const std::byte>(vertexShader.data(), vertexShader.size());
     pipelineDesc.pixelShader = std::span<const std::byte>(pixelShader.data(), pixelShader.size());
@@ -106,7 +98,7 @@ void MigiMain()
         commandList->DrawIndexed({
             rhi->GetBufferGpuAddress(vertexBuffer),
             rhi->GetBufferGpuAddress(indexBuffer),
-            drgn::kNullGpuAddress,
+            rhi->GetBufferGpuAddress(userDataBuffer),
             3,
             0,
             0,
@@ -121,6 +113,7 @@ void MigiMain()
 
     rhi->WaitIdle();
     rhi->DestroyShaderPipeline(pipeline);
+    rhi->DestroyBuffer(userDataBuffer);
     rhi->DestroyBuffer(indexBuffer);
     rhi->DestroyBuffer(vertexBuffer);
     rhi->DestroySwapChain(swapChain);

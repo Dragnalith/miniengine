@@ -19,6 +19,7 @@ cc_library(
     implementation_deps = [
         "_private_includes",
     ],
+    target_compatible_with = ["@platforms//os:windows"],
     visibility = ["//visibility:private"],
     deps = [
         ":rhi_api",
@@ -30,19 +31,30 @@ cc_library(
     ],
 )
 
+# Vulkan backend. On Android the Vulkan headers come from the NDK sysroot and
+# the loader is linked with `-lvulkan`; on Windows they come from the bundled
+# Vulkan SDK and its import library.
 cc_library(
     name = "rhi_vulkan",
     srcs = glob(["src/Vulkan/private/**/*.cpp"]),
     implementation_deps = [
         "_private_includes",
     ],
+    linkopts = select({
+        "@platforms//os:android": ["-lvulkan"],
+        "//conditions:default": [],
+    }),
     visibility = ["//visibility:private"],
     deps = [
         ":rhi_api",
         "//src/foundation",
-        "//thirdparty/VulkanSDK:vulkan",
-        "@msvc_toolchains//lib:kernel32",
-    ],
+    ] + select({
+        "@platforms//os:android": [],
+        "//conditions:default": [
+            "//thirdparty/VulkanSDK:vulkan",
+            "@msvc_toolchains//lib:kernel32",
+        ],
+    }),
 )
 
 alias(

@@ -32,19 +32,29 @@ def _find_in_runtime(java_runtime, basename):
             return f
     fail("Could not find {} in Java runtime {}".format(basename, java_runtime))
 
+# DX12 is Windows-only, so an APK's native code (and its shaders) must be built
+# with the Vulkan graphics API regardless of the global //build/config:gpuapi
+# flag. Both the deps split transition and the rule's own incoming transition
+# pin gpuapi to Vulkan so the RHI backend, the DRGN_GPUAPI_* defines, and the
+# DXC -> SPIR-V shader compilation all agree.
+_GPUAPI = "//build/config:gpuapi"
+
 def _android_split_transition_impl(settings, _attr):
     platforms = settings["//command_line_option:android_platforms"]
     if not platforms:
         fail("android_apk requires --android_platforms to be set.")
     return {
-        str(p): {"//command_line_option:platforms": str(p)}
+        str(p): {
+            "//command_line_option:platforms": str(p),
+            _GPUAPI: "Vulkan",
+        }
         for p in platforms
     }
 
 _android_split_transition = transition(
     implementation = _android_split_transition_impl,
     inputs = ["//command_line_option:android_platforms"],
-    outputs = ["//command_line_option:platforms"],
+    outputs = ["//command_line_option:platforms", _GPUAPI],
 )
 
 def _reset_to_host_transition_impl(settings, _attr):
@@ -55,12 +65,17 @@ def _reset_to_host_transition_impl(settings, _attr):
     # requested under `--platforms=//:android`. The native libraries are
     # unaffected -- they are produced by the `deps` split transition over
     # `--android_platforms` and keep targeting Android.
-    return {"//command_line_option:platforms": str(settings["//command_line_option:host_platform"])}
+    return {
+        "//command_line_option:platforms": str(settings["//command_line_option:host_platform"]),
+        # The APK's assets (e.g. shaders) are analyzed in this configuration, so
+        # pin Vulkan here too to get SPIR-V shaders instead of DXIL.
+        _GPUAPI: "Vulkan",
+    }
 
 _reset_to_host_transition = transition(
     implementation = _reset_to_host_transition_impl,
     inputs = ["//command_line_option:host_platform"],
-    outputs = ["//command_line_option:platforms"],
+    outputs = ["//command_line_option:platforms", _GPUAPI],
 )
 
 def _link_shared(ctx, key, abi, deps):
