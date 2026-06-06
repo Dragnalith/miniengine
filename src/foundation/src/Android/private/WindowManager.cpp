@@ -7,8 +7,9 @@ namespace migi
 
 // The Android window is owned by the NativeActivity, not created by the engine,
 // so the backend is a thin adapter over the shared AndroidPlatform state filled
-// in by android_main. Input is not wired up yet; the engine treats the activity
-// going away (close-press event) as the only interaction.
+// in by android_main. Touch input is synthesized as a single-pointer mouse by
+// the NativeActivity input callback and surfaced here through GetMouseState;
+// keyboard and text input are not wired up yet.
 struct WindowManagerImpl
 {
 };
@@ -40,9 +41,9 @@ uint64_t WindowManager::GetLastClosePressEventIndex() const
     return AndroidPlatformState().closeEventIndex.load();
 }
 
-uint32_t WindowManager::GetMouseState(uint64_t, MouseState*, uint32_t) const
+uint32_t WindowManager::GetMouseState(uint64_t lastStateIndex, MouseState* states, uint32_t maxStateCount) const
 {
-    return 0;
+    return AndroidPlatformState().ReadMouseStates(lastStateIndex, states, maxStateCount);
 }
 
 uint32_t WindowManager::GetKeyboardState(uint64_t, KeyboardState*, uint32_t) const

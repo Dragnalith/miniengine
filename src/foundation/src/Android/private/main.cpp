@@ -6,6 +6,7 @@
 #include "AndroidApp.h"
 
 #include <android_native_app_glue.h>
+#include <android/input.h>
 #include <android/native_window.h>
 
 #include <pthread.h>
@@ -38,6 +39,36 @@ AndroidPlatform& AndroidPlatformState()
 {
     static AndroidPlatform state;
     return state;
+}
+
+void AndroidPlatform::PushMouse(int x, int y, bool leftDown, bool inWindow)
+{
+    std::scoped_lock<std::mutex> lock(inputMutex);
+    mouse.x = x;
+    mouse.y = y;
+    mouse.inWindow = inWindow;
+    mouse.buttonsDown[static_cast<size_t>(MouseButton::Left)] = leftDown;
+    mouse.stateIndex = ++nextMouseStateIndex;
+    mouseHistory.push_back(mouse);
+    while (mouseHistory.size() > kMouseHistoryCapacity)
+        mouseHistory.pop_front();
+}
+
+uint32_t AndroidPlatform::ReadMouseStates(uint64_t lastStateIndex, MouseState* states, uint32_t maxStateCount)
+{
+    if (states == nullptr || maxStateCount == 0)
+        return 0;
+
+    std::scoped_lock<std::mutex> lock(inputMutex);
+    uint32_t copied = 0;
+    for (auto it = mouseHistory.rbegin(); it != mouseHistory.rend() && copied < maxStateCount; ++it)
+    {
+        if (it->stateIndex <= lastStateIndex)
+            break;
+        states[copied] = *it;
+        ++copied;
+    }
+    return copied;
 }
 
 } // namespace migi
@@ -120,6 +151,43 @@ void OnAppCmd(android_app* app, int32_t cmd)
     }
 }
 
+// Translate the primary touch pointer into the single-pointer mouse model Dear
+// ImGui understands. The position is pushed in the same state as the button
+// change so the engine emits the move-then-click ordering ImGui expects (touch
+// has no hover phase to establish the cursor position before a press). On
+// release the pointer is also moved out of the window so no widget keeps a
+// stale hover after the finger lifts.
+int32_t OnInputEvent(android_app*, AInputEvent* event)
+{
+    if (AInputEvent_getType(event) != AINPUT_EVENT_TYPE_MOTION)
+        return 0;
+
+    const int32_t action = AMotionEvent_getAction(event) & AMOTION_EVENT_ACTION_MASK;
+    const int x = static_cast<int>(AMotionEvent_getX(event, 0));
+    const int y = static_cast<int>(AMotionEvent_getY(event, 0));
+    migi::AndroidPlatform& state = migi::AndroidPlatformState();
+
+    switch (action)
+    {
+    case AMOTION_EVENT_ACTION_DOWN:
+        state.PushMouse(x, y, true, true);
+        return 1;
+
+    case AMOTION_EVENT_ACTION_MOVE:
+        state.PushMouse(x, y, true, true);
+        return 1;
+
+    case AMOTION_EVENT_ACTION_UP:
+    case AMOTION_EVENT_ACTION_CANCEL:
+        state.PushMouse(x, y, false, true);
+        state.PushMouse(x, y, false, false);
+        return 1;
+
+    default:
+        return 0;
+    }
+}
+
 void PumpEvents(android_app* app)
 {
     int events = 0;
@@ -144,6 +212,7 @@ extern "C" void android_main(struct android_app* app)
     RenderThread renderThread;
     app->userData = &renderThread;
     app->onAppCmd = OnAppCmd;
+    app->onInputEvent = OnInputEvent;
     migi::AndroidPlatformState().assetManager = app->activity->assetManager;
 
     while (!g_windowReady && !app->destroyRequested)
