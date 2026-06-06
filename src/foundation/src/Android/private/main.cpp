@@ -1,5 +1,6 @@
 #include <fnd/MigiMain.h>
 #include <fnd/Profiler.h>
+#include <private/JobSystem.h>
 
 #include <android_native_app_glue.h>
 
@@ -25,10 +26,13 @@ bool IsProfilingEnabled()
 } // namespace fnd
 
 // NativeActivity entry point, invoked by android_native_app_glue on a dedicated
-// thread once the activity is created. Non-interactive examples just run the
-// engine entry point and return; returning tears the activity back down.
+// thread once the activity is created. Mirrors the desktop bootstrap: run the
+// engine entry point inside the job system so job-dispatching code works.
+// Returning tears the activity back down.
 extern "C" void android_main(struct android_app* app)
 {
     (void)app;
-    MigiMain();
+    migi::JobSystem::Start([] {
+        MigiMain();
+    });
 }

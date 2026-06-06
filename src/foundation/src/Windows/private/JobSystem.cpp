@@ -5,8 +5,8 @@
 #include <fnd/SpinLock.h>
 
 #include <fnd/Profiler.h>
+#include <private/Fiber.h>
 
-#include <windows.h>
 #include <format>
 #include <optional>
 #include <vector>
@@ -50,7 +50,7 @@ public:
     FiberJob(const char* name)
     {
         AssertValid();
-        m_fiber = ::CreateFiber(64 * 1024, FiberJob::FiberFunc, this);
+        m_fiber = fnd::FiberCreate(&FiberJob::FiberFunc, this);
         m_fiber_name = name;
         MIGI_ASSERT(m_fiber != nullptr, "Fiber creation has failed");
     }
@@ -64,7 +64,7 @@ public:
     ~FiberJob() {
         if (m_fiber != nullptr) {
             MIGI_ASSERT(IsDone(), "fiber is destroyed, but func is not complete. something is wrong");
-            ::DeleteFiber(m_fiber);
+            fnd::FiberDelete(m_fiber);
         }
     }
 
@@ -299,7 +299,7 @@ private:
         std::string fiber_name = std::format("FiberWorker {}", m_index);
         PROFILE_SET_THREADNAME(thread_name.c_str());
 
-        g_threadFiber = ::ConvertThreadToFiber(nullptr);
+        g_threadFiber = fnd::FiberConvertThread();
         g_threadFiberName = fiber_name.c_str();
         PROFILE_REGISTER_FIBER(g_threadFiber, g_threadFiberName);
         g_threadWorker = this;
@@ -332,7 +332,7 @@ private:
             }
         }
         PROFILE_UNREGISTER_FIBER(GetCurrentFiber(), fiber_name.c_str());
-        ::ConvertFiberToThread();
+        fnd::FiberConvertToThread();
     }
 
     FiberJob* m_currentFiber = nullptr;

@@ -1,9 +1,42 @@
-load("@rules_cc//cc:defs.bzl", "cc_binary")
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
+load("//build/rules/android:apk.bzl", "android_apk")
+load("//build/rules/android:emulator.bzl", "android_emulator")
 
-cc_binary(
-    name = "job_system",
+cc_library(
+    name = "job_system_lib",
     srcs = ["JobSystemExample.cpp"],
-    deps = [
-        "//src/foundation",
-    ],
+    alwayslink = True,
+    deps = ["//src/foundation"],
+)
+
+# Desktop (Windows) executable.
+cc_binary(
+    name = "job_system_exe",
+    deps = [":job_system_lib"],
+)
+
+android_emulator(
+    name = "emulator",
+)
+
+# Android APK. The packaged native library is lib<name>.so, so the target name
+# must match android.app.lib_name in AndroidManifest.xml ("job_system_apk").
+android_apk(
+    name = "job_system_apk",
+    custom_package = "com.example.jobsystem",
+    default_emulator = ":emulator",
+    manifest = "AndroidManifest.xml",
+    deps = [":job_system_lib"],
+)
+
+# Platform-dispatching entry point:
+#   bazel run //examples/job_system                         (desktop executable)
+#   bazel run //examples/job_system --platforms=//:android  (Android APK)
+alias(
+    name = "job_system",
+    actual = select({
+        "@platforms//os:android": ":job_system_apk",
+        "//conditions:default": ":job_system_exe",
+    }),
+    visibility = ["//visibility:public"],
 )

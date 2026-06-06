@@ -24,6 +24,7 @@ struct Job
 class JobCounter {
 	friend class FiberJob;
 	friend class JobQueue;
+	friend struct Job;
 public:
 	void Set(int64_t value) {
 		m_counter.store(value);

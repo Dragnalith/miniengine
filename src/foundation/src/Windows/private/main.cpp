@@ -23,10 +23,6 @@ mbstowcs_s(&result, thread_name, std::size(thread_name), name, std::size(thread_
 bool IsProfilingEnabled() {
     return false;
 }
-
-void SwitchFiber(void* fiber, const char*) {
-    ::SwitchToFiber(fiber);
-}
 }
 
 int main(int argc, char** argv) {
