@@ -100,6 +100,20 @@ def run_capture(cmd):
     )
 
 
+def run_quiet(cmd):
+    # Like run(), but does not echo the command or its output on success. Only
+    # on failure are the captured stdout and stderr surfaced before aborting.
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if result.returncode != 0:
+        pretty = " ".join(('"%s"' % c if " " in c else c) for c in cmd)
+        if result.stdout:
+            sys.stdout.write(result.stdout)
+        if result.stderr:
+            sys.stderr.write(result.stderr)
+        raise SystemExit("command failed (%d): %s" % (result.returncode, pretty))
+    return result
+
+
 def adb_devices(adb):
     result = run_capture([adb, "devices"])
     if result.returncode != 0:
@@ -198,7 +212,7 @@ def start_default_emulator():
 
 
 def select_serial(adb, selector_kind, identifier, allow_start_default):
-    run([adb, "start-server"])
+    run_quiet([adb, "start-server"])
     rows = adb_devices(adb)
 
     if selector_kind == "device":
@@ -252,33 +266,116 @@ def apk_package_and_activity(aapt2, apk):
     return pkg_m.group(1), activity
 
 
+def app_uid(adb, serial, package):
+    # The kernel uid is allocated at install time and is stable across launches
+    # and reboots, so it makes a reliable `logcat --uid=<uid>` filter. Parsed
+    # from `pm list packages -U`, whose lines look like:
+    #     package:com.example.helloworld uid:10234
+    result = run_capture([adb, "-s", serial, "shell", "pm", "list", "packages", "-U", package])
+    if result.returncode != 0:
+        return None
+    for line in result.stdout.splitlines():
+        tokens = line.split()
+        if ("package:" + package) in tokens:
+            for token in tokens:
+                if token.startswith("uid:"):
+                    return token[len("uid:"):]
+    return None
+
+
+LOG_TAG = "miniengine"
+
+
+def device_time(adb, serial):
+    # Local device clock in logcat's threadtime format, used as a lower bound so
+    # we only consider log lines produced by this launch.
+    result = run_capture([adb, "-s", serial, "shell", "date", "+%m-%d %H:%M:%S.000"])
+    if result.returncode == 0 and result.stdout.strip():
+        return result.stdout.strip()
+    return None
+
+
+def _pid_from_logcat(adb, serial, since):
+    # A logging app records its pid in logcat (threadtime: "<date> <time> <pid>
+    # <tid> <prio> <tag>: msg"), and that line survives the process exiting.
+    # Restrict to our tag and to entries since `since` so a previous run is not
+    # mistaken for this one; return the most recent matching pid.
+    args = [adb, "-s", serial, "logcat", "-d", "-v", "threadtime"]
+    if since:
+        args += ["-t", since]
+    args += ["%s:I" % LOG_TAG, "*:S"]
+    result = run_capture(args)
+    if result.returncode != 0:
+        return None
+    pid = None
+    for line in result.stdout.splitlines():
+        parts = line.split()
+        if len(parts) >= 5 and parts[2].isdigit():
+            pid = parts[2]
+    return pid
+
+
+def app_pid(adb, serial, package, since):
+    # Fast path: the live process table, for apps still running.
+    for _ in range(5):
+        result = run_capture([adb, "-s", serial, "shell", "pidof", package])
+        if result.returncode == 0 and result.stdout.split():
+            return result.stdout.split()[0]
+        time.sleep(0.1)
+    # Robust path for short-lived apps: recover the pid from the buffered log,
+    # which outlives the process. Retry briefly in case the log hasn't flushed.
+    for _ in range(10):
+        pid = _pid_from_logcat(adb, serial, since)
+        if pid:
+            return pid
+        time.sleep(0.2)
+    return None
+
+
 def install_apk(adb, serial, apk, package):
     cmd = [adb, "-s", serial, "install", "-r", "-t", apk]
-    pretty = " ".join(('"%s"' % c if " " in c else c) for c in cmd)
-    print(">>", pretty)
     result = subprocess.run(
         cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
     )
-    sys.stdout.write(result.stdout)
     if result.returncode == 0:
         return
     if "INSTALL_FAILED_UPDATE_INCOMPATIBLE" not in result.stdout:
+        sys.stdout.write(result.stdout)
+        pretty = " ".join(('"%s"' % c if " " in c else c) for c in cmd)
         raise SystemExit("command failed (%d): %s" % (result.returncode, pretty))
     print("Signing-key mismatch; uninstalling old %s and retrying." % package)
-    run([adb, "-s", serial, "uninstall", package])
-    run(cmd)
+    run_quiet([adb, "-s", serial, "uninstall", package])
+    run_quiet(cmd)
 
 
 def launch_apk(adb, aapt2, apk, serial):
     package, activity = apk_package_and_activity(aapt2, apk)
-    print("APK package=%s activity=%s" % (package, activity))
-    print("Using Android target: %s" % serial)
+    print("Launching %s on %s..." % (package, serial))
     install_apk(adb, serial, apk, package)
-    run([adb, "-s", serial, "shell", "am", "start", "-n", package + "/" + activity])
-    print("Launched %s on %s" % (package, serial))
+    since = device_time(adb, serial)
+    run_quiet([adb, "-s", serial, "shell", "am", "start", "-n", package + "/" + activity])
+    print("%s has been launched successfully." % package)
+    print("device: %s" % serial)
+
+    uid = app_uid(adb, serial, package)
+    print("uid: %s" % (uid or "<unknown>"))
+
+    pid = app_pid(adb, serial, package, since)
+    print("pid: %s" % (pid or "<unknown>"))
+
+    if pid:
+        log_filter = "--pid=%s" % pid
+    elif uid:
+        log_filter = "--uid=%s" % uid
+    else:
+        log_filter = "-s miniengine"
+    print(
+        "Read the log with `bazel run //build/rules/android:adb -- "
+        "-s %s logcat -d %s`" % (serial, log_filter)
+    )
 
 
 def stream_log(adb, serial):
