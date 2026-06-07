@@ -162,24 +162,6 @@ void Renderer::Render(FrameData& frameData)
 
     m_impl->imguiRenderer.Render(*commandList, frameData.drawData);
     commandList->EndRenderPass();
-
-    {
-        PROFILE_SCOPE("Renderer Jobs");
-        migi::JobCounter handle;
-        for (int i = 0; i < frameData.rendererjobNumber; i++)
-        {
-            migi::Job::Dispatch("RenderObject Job", handle, [i] {
-                RenderMultipleObject(i % 3);
-            });
-        }
-        migi::Job::Wait(handle);
-    }
-
-    {
-        migi::TimePoint beforeWorkloadTime = migi::TimePoint::Now();
-        PROFILE_SCOPE("Renderer Workload");
-        RandomWorkload(frameData.renderStageUs - static_cast<int>((beforeWorkloadTime - startTime).ToMicroseconds()));
-    }
 }
 
 void Renderer::Kick(const FrameData& frameData)

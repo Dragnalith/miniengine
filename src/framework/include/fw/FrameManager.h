@@ -4,6 +4,7 @@
 #include <fnd/JobSemaphore.h>
 #include <fnd/Util.h>
 #include <fnd/SpinLock.h>
+#include <fw/FrameData.h>
 #include <fw/IFramePipeline.h>
 
 #include <stdint.h>
@@ -42,6 +43,12 @@ private:
 
     SpinLock m_frameLatencyLock;
     int64_t m_maxFrameLatency = 0;
+
+    // Rolling timing history for the pipeline stages and blocking waits.
+    // Written at the end of each (concurrent) frame and snapshotted into
+    // FrameData at the start, so it is guarded by its own lock.
+    SpinLock m_historyLock;
+    FrameMetricHistory m_history;
 };
 
 } // namespace migi

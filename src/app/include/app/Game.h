@@ -25,6 +25,7 @@ private:
     bool m_fullscreen = false;
     bool m_vsync = true;
     bool m_show_demo_window = true;
+    bool m_demoWindowPlaced = false;
     bool m_show_another_window = false;
     int m_selectedStrategy = 0;
     float m_f = 0.0f;

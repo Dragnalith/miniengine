@@ -7,8 +7,10 @@
 
 #include <android_native_app_glue.h>
 #include <android/input.h>
+#include <android/native_activity.h>
 #include <android/native_window.h>
 
+#include <jni.h>
 #include <pthread.h>
 
 #include <thread>
@@ -117,6 +119,98 @@ void UpdateWindowMetrics(ANativeWindow* window)
     migi::AndroidPlatformState().height.store(ANativeWindow_getHeight(window));
 }
 
+// Hide the status and navigation bars so the activity runs fully immersive,
+// the way games do. Apps targeting SDK 35+ are forced edge-to-edge and the
+// legacy fullscreen flags are ignored, so the supported path is to drive the
+// window's WindowInsetsController (API 30+) and, on older devices, fall back to
+// the deprecated SYSTEM_UI_FLAG_* bits. The bars stay hidden (sticky) and only
+// reappear transiently on an edge swipe, then auto-hide again.
+//
+// These calls touch the view hierarchy, so they must run on the UI thread.
+// EnableImmersiveMode is only ever invoked from the onWindowFocusChanged
+// callback below (which the framework dispatches on the UI thread); activity->env
+// is the UI thread's JNIEnv there, so no thread attach is required.
+void EnableImmersiveMode(ANativeActivity* activity)
+{
+    if (activity == nullptr || activity->env == nullptr || activity->clazz == nullptr)
+        return;
+
+    JNIEnv* env = activity->env;
+
+    jclass versionClass = env->FindClass("android/os/Build$VERSION");
+    jfieldID sdkIntField = env->GetStaticFieldID(versionClass, "SDK_INT", "I");
+    const jint sdkInt = env->GetStaticIntField(versionClass, sdkIntField);
+
+    jclass activityClass = env->GetObjectClass(activity->clazz);
+    jmethodID getWindow = env->GetMethodID(activityClass, "getWindow", "()Landroid/view/Window;");
+    jobject window = env->CallObjectMethod(activity->clazz, getWindow);
+    jclass windowClass = env->GetObjectClass(window);
+    jmethodID getDecorView = env->GetMethodID(windowClass, "getDecorView", "()Landroid/view/View;");
+    jobject decorView = env->CallObjectMethod(window, getDecorView);
+    jclass viewClass = env->GetObjectClass(decorView);
+
+    if (sdkInt >= 30)
+    {
+        // window.setDecorFitsSystemWindows(false): opt the content into laying
+        // out behind the (now-hidden) bars instead of being inset by them.
+        jmethodID setDecorFits = env->GetMethodID(windowClass, "setDecorFitsSystemWindows", "(Z)V");
+        env->CallVoidMethod(window, setDecorFits, JNI_FALSE);
+
+        jmethodID getController =
+            env->GetMethodID(viewClass, "getWindowInsetsController", "()Landroid/view/WindowInsetsController;");
+        jobject controller = env->CallObjectMethod(decorView, getController);
+        if (controller != nullptr)
+        {
+            jclass controllerClass = env->GetObjectClass(controller);
+
+            jfieldID behaviorField =
+                env->GetStaticFieldID(controllerClass, "BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE", "I");
+            const jint behavior = env->GetStaticIntField(controllerClass, behaviorField);
+            jmethodID setBehavior = env->GetMethodID(controllerClass, "setSystemBarsBehavior", "(I)V");
+            env->CallVoidMethod(controller, setBehavior, behavior);
+
+            jclass typeClass = env->FindClass("android/view/WindowInsets$Type");
+            jmethodID systemBars = env->GetStaticMethodID(typeClass, "systemBars", "()I");
+            const jint types = env->CallStaticIntMethod(typeClass, systemBars);
+            jmethodID hide = env->GetMethodID(controllerClass, "hide", "(I)V");
+            env->CallVoidMethod(controller, hide, types);
+        }
+    }
+    else
+    {
+        // Pre-API-30 immersive sticky via the legacy decor-view flags.
+        constexpr jint kLayoutStable = 0x00000100;
+        constexpr jint kLayoutHideNavigation = 0x00000200;
+        constexpr jint kLayoutFullscreen = 0x00000400;
+        constexpr jint kHideNavigation = 0x00000002;
+        constexpr jint kFullscreen = 0x00000004;
+        constexpr jint kImmersiveSticky = 0x00001000;
+        const jint flags = kLayoutStable | kLayoutHideNavigation | kLayoutFullscreen | kHideNavigation |
+                           kFullscreen | kImmersiveSticky;
+        jmethodID setSystemUiVisibility = env->GetMethodID(viewClass, "setSystemUiVisibility", "(I)V");
+        env->CallVoidMethod(decorView, setSystemUiVisibility, flags);
+    }
+
+    // Never let a stray JNI exception ride back into the framework's call into
+    // native (it would abort on the next JNI transition).
+    if (env->ExceptionCheck())
+        env->ExceptionClear();
+}
+
+// The framework calls onWindowFocusChanged on the UI thread. android_native_app_glue
+// installs its own handler (to post APP_CMD_GAINED_FOCUS); we chain it so the glue
+// keeps working and re-assert immersive mode whenever the activity regains focus,
+// which is also when the system has re-shown the bars after a transient swipe.
+void (*g_glueOnWindowFocusChanged)(ANativeActivity*, int) = nullptr;
+
+void OnWindowFocusChanged(ANativeActivity* activity, int hasFocus)
+{
+    if (g_glueOnWindowFocusChanged != nullptr)
+        g_glueOnWindowFocusChanged(activity, hasFocus);
+    if (hasFocus)
+        EnableImmersiveMode(activity);
+}
+
 bool g_windowReady = false;
 
 void OnAppCmd(android_app* app, int32_t cmd)
@@ -214,6 +308,11 @@ extern "C" void android_main(struct android_app* app)
     app->onAppCmd = OnAppCmd;
     app->onInputEvent = OnInputEvent;
     migi::AndroidPlatformState().assetManager = app->activity->assetManager;
+
+    // Chain the glue's focus callback so we can hide the system bars (immersive
+    // mode) on the UI thread. Installed before the first focus event arrives.
+    g_glueOnWindowFocusChanged = app->activity->callbacks->onWindowFocusChanged;
+    app->activity->callbacks->onWindowFocusChanged = OnWindowFocusChanged;
 
     while (!g_windowReady && !app->destroyRequested)
         PumpEvents(app);

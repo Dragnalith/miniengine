@@ -52,7 +52,18 @@ void FrameManager::RunFrame(FrameUpdateResult prevResult) {
     
     std::string frameName = std::format("Index = {}", frameIndex);
 
-    m_startSemaphore.Acquire();
+    // Timings (microseconds) recorded for this frame; pushed into the history
+    // once the frame completes. Indexed by FrameMetric.
+    float metricsUs[kFrameMetricCount] = {};
+    auto elapsedUs = [](TimePoint from) {
+        return static_cast<float>((TimePoint::Now() - from).ToMicroseconds());
+    };
+
+    {
+        TimePoint acquireStart = TimePoint::Now();
+        m_startSemaphore.Acquire();
+        metricsUs[static_cast<int>(FrameMetric::StartAcquire)] = elapsedUs(acquireStart);
+    }
 
     TimePoint now = TimePoint::Now();
     float deltatime = static_cast<float>((now - m_lastStartFrameTime).ToSeconds());
@@ -65,34 +76,58 @@ void FrameManager::RunFrame(FrameUpdateResult prevResult) {
     frameData.renderStageUs = prevResult.renderStageUs;
     frameData.gameStageUs = prevResult.gameStageUs;
 
+    // Hand the stages the metric history as of this frame's start so they can
+    // display the running averages.
+    {
+        std::scoped_lock<SpinLock> lock(m_historyLock);
+        frameData.metrics = m_history;
+    }
+
     PROFILE_SCOPE_DATA_COLOR("Frame", frameName.c_str(), 34, 30, 203);
     {
         PROFILE_SCOPE_DATA_COLOR("Update", frameName.c_str(), 51, 217, 21);
 
+        TimePoint updateStart = TimePoint::Now();
         m_pipeline.Update(frameData);
+        metricsUs[static_cast<int>(FrameMetric::Update)] = elapsedUs(updateStart);
         if (!frameData.result.stop) {
             StartFrame(frameData.result);
         }
     }
 
     {
+        TimePoint renderWaitStart = TimePoint::Now();
         Job::Wait(m_renderSemaphore, frameData.frameIndex);
+        metricsUs[static_cast<int>(FrameMetric::RenderWait)] = elapsedUs(renderWaitStart);
         PROFILE_SCOPE_DATA_COLOR("Render", frameName.c_str(), 238, 220, 0);
+        TimePoint renderStart = TimePoint::Now();
         m_pipeline.Render(frameData); 
+        metricsUs[static_cast<int>(FrameMetric::Render)] = elapsedUs(renderStart);
         m_renderSemaphore.Set(frameData.frameIndex + 1);
     }
 
     {
+        TimePoint kickWaitStart = TimePoint::Now();
         Job::Wait(m_kickSemaphore, frameData.frameIndex);
+        metricsUs[static_cast<int>(FrameMetric::KickWait)] = elapsedUs(kickWaitStart);
         PROFILE_SCOPE_DATA_COLOR("Kick", frameName.c_str(), 238, 0, 60);
+        TimePoint kickStart = TimePoint::Now();
         m_pipeline.Kick(frameData);
+        metricsUs[static_cast<int>(FrameMetric::Kick)] = elapsedUs(kickStart);
         PROFILE_DEFAULT_FRAME; // Present on screen
         m_kickSemaphore.Set(frameData.frameIndex + 1);
     }
 
     {
         PROFILE_SCOPE_DATA_COLOR("Clean", frameName.c_str(), 150, 150, 150);
+        TimePoint cleanStart = TimePoint::Now();
         m_pipeline.Clean(frameData);
+        metricsUs[static_cast<int>(FrameMetric::Clean)] = elapsedUs(cleanStart);
+    }
+
+    {
+        std::scoped_lock<SpinLock> lock(m_historyLock);
+        m_history.Push(metricsUs);
     }
     m_startSemaphore.Release();
 }

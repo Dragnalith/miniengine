@@ -29,7 +29,7 @@ Game::Game() {
     m_lastClosePressEventIndex = migi::WindowGetLastClosePressEventIndex();
 }
 
-// Create some 
+// Create some
 void UpdateSubPosition(int i) {
     PROFILE_SCOPE("UpdateSubPosition");
 
@@ -41,28 +41,44 @@ void UpdatePosition(int i) {
     UpdateSubPosition(2 * i);
 }
 
-void Game::Update(migi::FrameData& frameData) 
+void Game::Update(migi::FrameData& frameData)
 {
     migi::TimePoint startTime = migi::TimePoint::Now();
 
-    {
-        PROFILE_SCOPE("Game Jobs");
-
-        migi::JobCounter handle;
-        for (int i = 0; i < frameData.gamejobNumber; i++) {
-            migi::Job::Dispatch("UpdatePosition Job", handle, [i] {
-                UpdatePosition(i);
-            });
-        }
-        migi::Job::Wait(handle);
-    }
     frameData.result.stop = m_lastClosePressEventIndex != migi::WindowGetLastClosePressEventIndex();
+
+    // Default the tool windows to one third down the screen, independent of the
+    // resolution. FirstUseEver only seeds the initial placement, so the user can
+    // still drag the windows afterwards.
+    const migi::Int2 windowSize = migi::WindowGetSize();
+    const float oneThirdY = static_cast<float>(windowSize.y) / 3.0f;
+    const float marginX = static_cast<float>(windowSize.x) * 0.02f;
+
     // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
     if (m_show_demo_window)
+    {
         ImGui::ShowDemoWindow(&m_show_demo_window);
+        // ShowDemoWindow seeds its own FirstUseEver position internally, so a
+        // SetNextWindowPos before it would be overwritten. Override the placement
+        // once, right after the demo window has been created this frame.
+        if (!m_demoWindowPlaced)
+        {
+            // ShowDemoWindow seeds the demo window to 550px wide (FirstUseEver),
+            // so center it horizontally on the screen while keeping the
+            // one-third-down vertical anchor.
+            constexpr float kDemoWidth = 550.0f;
+            const float demoX = (static_cast<float>(windowSize.x) - kDemoWidth) * 0.5f;
+            ImGui::SetWindowPos("Dear ImGui Demo", ImVec2(demoX, oneThirdY));
+            m_demoWindowPlaced = true;
+        }
+    }
 
     // 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
     {
+        ImGui::SetNextWindowPos(ImVec2(marginX, oneThirdY), ImGuiCond_FirstUseEver);
+        // Default to a third of the screen width (auto height) so the window
+        // isn't squished flat, independent of resolution.
+        ImGui::SetNextWindowSize(ImVec2(static_cast<float>(windowSize.x) * 0.33f, 0.0f), ImGuiCond_FirstUseEver);
         ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
 
         ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
@@ -84,13 +100,26 @@ void Game::Update(migi::FrameData& frameData)
         ImGui::SliderInt("MaxFrameLatency", &maxFrameLatency, 1, 3);
         frameData.result.maxFrameLatency = maxFrameLatency;
 
-        int gameStageUs = frameData.gameStageUs;
-        ImGui::SliderInt("Game Stade (us)", &gameStageUs, 1, 35000);
-        frameData.result.gameStageUs = gameStageUs;
-
-        int renderStageUs = frameData.renderStageUs;
-        ImGui::SliderInt("Render Stage (us)", &renderStageUs, 1, 35000);
-        frameData.result.renderStageUs = renderStageUs;
+        ImGui::Separator();
+        ImGui::Text("Frame Timings (avg ms)");
+        if (ImGui::BeginTable("FrameMetrics", 2,
+                ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
+        {
+            ImGui::TableSetupColumn("Stage");
+            ImGui::TableSetupColumn("Avg (ms)");
+            ImGui::TableHeadersRow();
+            for (int i = 0; i < migi::kFrameMetricCount; ++i)
+            {
+                const float avgMs =
+                    frameData.metrics.AverageUs(static_cast<migi::FrameMetric>(i)) / 1000.0f;
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                ImGui::TextUnformatted(migi::kFrameMetricNames[i]);
+                ImGui::TableSetColumnIndex(1);
+                ImGui::Text("%.3f", avgMs);
+            }
+            ImGui::EndTable();
+        }
 
         int selectedStrategy = m_selectedStrategy;
         ImGui::Combo("Frame Strategy", &selectedStrategy, g_frame_strategy, IM_ARRAYSIZE(g_frame_strategy));
@@ -126,6 +155,7 @@ void Game::Update(migi::FrameData& frameData)
     // 3. Show another simple window.
     if (m_show_another_window)
     {
+        ImGui::SetNextWindowPos(ImVec2(marginX + 40.0f, oneThirdY + 40.0f), ImGuiCond_FirstUseEver);
         ImGui::Begin("Another Window", &m_show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
         ImGui::Text("Hello from another window!");
         if (ImGui::Button("Close Me"))
@@ -134,12 +164,6 @@ void Game::Update(migi::FrameData& frameData)
     }
     frameData.fullscreen = m_fullscreen;
     frameData.vsync = m_vsync;
-
-    {
-        migi::TimePoint beforeWorkloadTime = migi::TimePoint::Now();
-        PROFILE_SCOPE("Game Workload");
-        migi::RandomWorkload(frameData.gameStageUs - static_cast<int>((beforeWorkloadTime - startTime).ToMicroseconds())); // random workload of 5ms to be visible on profiler
-    }
 }
 
 }

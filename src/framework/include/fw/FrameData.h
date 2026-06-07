@@ -52,6 +52,65 @@ struct DrawData
     std::vector<DrawList> DrawLists;
 };
 
+// Per-frame timings the FrameManager records for each pipeline stage and each
+// blocking wait. Kept in this fixed order; kFrameMetricNames mirrors it.
+enum class FrameMetric : int
+{
+    Update,      // m_pipeline.Update
+    Render,      // m_pipeline.Render
+    Kick,        // m_pipeline.Kick
+    Clean,       // m_pipeline.Clean
+    StartAcquire,// m_startSemaphore.Acquire (frame-latency gate)
+    RenderWait,  // Job::Wait on the render ordering semaphore
+    KickWait,    // Job::Wait on the kick ordering semaphore
+    Count,
+};
+
+inline constexpr int kFrameMetricCount = static_cast<int>(FrameMetric::Count);
+
+inline constexpr const char* kFrameMetricNames[kFrameMetricCount] = {
+    "Update",
+    "Render",
+    "Kick",
+    "Clean",
+    "Start Acquire",
+    "Render Wait",
+    "Kick Wait",
+};
+
+// Circular buffer of the last kCapacity frames' timings (microseconds), one
+// row of kFrameMetricCount values per frame. Owned by the FrameManager and
+// snapshotted into FrameData each frame so any stage can read the averages.
+struct FrameMetricHistory
+{
+    static constexpr int kCapacity = 128;
+
+    float samplesUs[kCapacity][kFrameMetricCount] = {};
+    int count = 0; // number of valid rows (<= kCapacity)
+    int next = 0;  // next row to overwrite
+
+    void Push(const float values[kFrameMetricCount])
+    {
+        for (int i = 0; i < kFrameMetricCount; ++i)
+            samplesUs[next][i] = values[i];
+        next = (next + 1) % kCapacity;
+        if (count < kCapacity)
+            ++count;
+    }
+
+    // Average of a metric over the recorded history, in microseconds.
+    float AverageUs(FrameMetric metric) const
+    {
+        if (count == 0)
+            return 0.0f;
+        const int m = static_cast<int>(metric);
+        float sum = 0.0f;
+        for (int i = 0; i < count; ++i)
+            sum += samplesUs[i][m];
+        return sum / static_cast<float>(count);
+    }
+};
+
 struct FrameData
 {
     int64_t frameIndex = 0;
@@ -68,6 +127,8 @@ struct FrameData
     DrawData drawData;
     RenderContext* renderContext;
     FrameUpdateResult result;
+    // Snapshot of the FrameManager's metric history as of this frame's start.
+    FrameMetricHistory metrics;
 };
 
 }

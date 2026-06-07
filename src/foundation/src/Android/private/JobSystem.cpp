@@ -1,9 +1,11 @@
 #include <private/JobSystem.h>
 
 #include <fnd/Job.h>
+#include <fnd/Log.h>
 
 #include <atomic>
 #include <condition_variable>
+#include <format>
 #include <functional>
 #include <mutex>
 #include <thread>
@@ -49,6 +51,8 @@ public:
                 worker = new Worker(this);
                 m_all.push_back(worker);
                 worker->thread = std::thread([worker] { worker->Run(); });
+                MIGI_LOG_INFO(
+                    std::format("Job system: spawned new worker thread (total = {})", m_all.size()).c_str());
             }
         }
         worker->Assign(std::move(job));
