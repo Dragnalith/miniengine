@@ -52,17 +52,14 @@ struct DrawData
     std::vector<DrawList> DrawLists;
 };
 
-// Per-frame timings the FrameManager records for each pipeline stage and each
-// blocking wait. Kept in this fixed order; kFrameMetricNames mirrors it.
+// Per-frame timings the FrameManager records for each pipeline stage. Kept in
+// this fixed order; kFrameMetricNames mirrors it.
 enum class FrameMetric : int
 {
     Update,      // m_pipeline.Update
     Render,      // m_pipeline.Render
     Kick,        // m_pipeline.Kick
     Clean,       // m_pipeline.Clean
-    StartAcquire,// m_startSemaphore.Acquire (frame-latency gate)
-    RenderWait,  // Job::Wait on the render ordering semaphore
-    KickWait,    // Job::Wait on the kick ordering semaphore
     Count,
 };
 
@@ -73,9 +70,6 @@ inline constexpr const char* kFrameMetricNames[kFrameMetricCount] = {
     "Render",
     "Kick",
     "Clean",
-    "Start Acquire",
-    "Render Wait",
-    "Kick Wait",
 };
 
 // Circular buffer of the last kCapacity frames' timings (microseconds), one

@@ -18,6 +18,14 @@ cc_library(
         "include/imgui/*.h",
         "include/fw/*.h",
     ]),
+    copts = select({
+        # The vendored Dear ImGui (1.89) memset()s non-trivially-copyable types
+        # in its ctors, which the Android NDK's Clang flags as
+        # -Wnontrivial-memcall. It is benign for these POD-ish types, so silence
+        # it on the Android toolchain.
+        "@platforms//os:android": ["-Wno-nontrivial-memcall"],
+        "//conditions:default": [],
+    }),
     implementation_deps = [
         "_private_includes",
     ],

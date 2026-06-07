@@ -1,15 +1,10 @@
 #pragma once
 
-#include <fnd/Job.h>
-#include <fnd/JobSemaphore.h>
 #include <fnd/Util.h>
-#include <fnd/SpinLock.h>
 #include <fw/FrameData.h>
 #include <fw/IFramePipeline.h>
 
 #include <stdint.h>
-#include <atomic>
-#include <mutex>
 
 namespace migi
 {
@@ -17,7 +12,9 @@ namespace migi
 struct FrameUpdateResult;
 
 /* 
-    Run a IFramePipeline and interveal the stages
+    Run a IFramePipeline, executing each frame's stages sequentially: Update,
+    Render, Kick and Clean run back to back in a single loop, and the next
+    frame's Update only starts once the previous frame's Clean has returned.
 */
 class FrameManager
 {
@@ -25,10 +22,7 @@ public:
     FrameManager(IFramePipeline& pipeline);
     void Start();
 private:
-    void RunFrame(FrameUpdateResult result);
-    void StartFrame(FrameUpdateResult result);
-
-    void SetFrameLatency(int maxFrameLatency);
+    FrameUpdateResult RunFrame(FrameUpdateResult prevResult);
     int64_t AllocateFrameIndex();
 
 private:
@@ -36,23 +30,14 @@ private:
 
     TimePoint m_lastStartFrameTime;
 
-    JobCounter m_handle;
-    JobCounter m_renderSemaphore; // We should guarantee render stage progress in order, first in first out, so we cannot use JobSemaphore
-    JobCounter m_kickSemaphore; // We should guarantee render stage progress in order, first in first out, so we cannot use JobSemaphore
-    JobSemaphore m_startSemaphore;
     int64_t m_nextFrameIndex = 0;
-
-    SpinLock m_frameLatencyLock;
-    int64_t m_maxFrameLatency = 0;
 
     // Set once a frame reports a genuine quit; stops the Start() loop from
     // resuming after the pipeline drains.
-    std::atomic<bool> m_stopRequested{false};
+    bool m_stopRequested = false;
 
-    // Rolling timing history for the pipeline stages and blocking waits.
-    // Written at the end of each (concurrent) frame and snapshotted into
-    // FrameData at the start, so it is guarded by its own lock.
-    SpinLock m_historyLock;
+    // Rolling timing history for the pipeline stages, snapshotted into
+    // FrameData at the start of each frame so any stage can read the averages.
     FrameMetricHistory m_history;
 };
 

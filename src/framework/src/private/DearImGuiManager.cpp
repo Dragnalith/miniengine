@@ -42,6 +42,12 @@ DearImGuiManager::DearImGuiManager()
 
     ImGui::StyleColorsDark();
 
+#if defined(__ANDROID__)
+    // High-DPI phone/tablet screens render the default-sized UI far too small,
+    // so scale all ImGui text up on Android.
+    io.FontGlobalScale = 2.0f;
+#endif
+
     IM_ASSERT(io.BackendPlatformUserData == NULL && "Already initialized a renderer backend!");
 
     io.BackendPlatformUserData = nullptr;
