@@ -96,15 +96,13 @@ struct RenderThread
         started = true;
     }
 
-    // Ask MigiMain to exit (bump the close-press event the engine loops on) and
-    // wait for it to tear the RHI down. Safe to call more than once. Called
-    // while the ANativeWindow is still valid so the swapchain is destroyed
-    // before the window is released.
+    // Ask MigiMain to exit for good (the activity is being destroyed) and wait
+    // for it to tear the RHI down. Safe to call more than once.
     void Shutdown()
     {
         if (started && !joined)
         {
-            migi::AndroidPlatformState().closeEventIndex.fetch_add(1);
+            migi::AndroidPlatformState().RequestQuit();
             thread.join();
             joined = true;
         }
@@ -221,8 +219,11 @@ void OnAppCmd(android_app* app, int32_t cmd)
     case APP_CMD_INIT_WINDOW:
         if (app->window != nullptr)
         {
-            migi::AndroidPlatformState().window = app->window;
+            // A window is available: on first launch this bootstraps the engine;
+            // on a return from background it resumes a paused engine (which
+            // recreates its swapchain against this new window).
             UpdateWindowMetrics(app->window);
+            migi::AndroidPlatformState().OnWindowAvailable(app->window);
             g_windowReady = true;
         }
         break;
@@ -233,11 +234,14 @@ void OnAppCmd(android_app* app, int32_t cmd)
         break;
 
     case APP_CMD_TERM_WINDOW:
-        // The window is being destroyed: shut the engine down here, while the
-        // ANativeWindow is still alive, so the Vulkan surface is released
-        // before the system frees the window.
-        if (renderThread != nullptr)
-            renderThread->Shutdown();
+        // The window is being destroyed (backgrounded / locked). Tell the engine
+        // to release its Vulkan surface and pause; block here (while the
+        // ANativeWindow is still alive) until it confirms the surface is gone,
+        // then let the system free the window. The engine itself keeps running.
+        if (renderThread != nullptr && renderThread->started && !renderThread->joined)
+            migi::AndroidPlatformState().OnWindowDestroyed();
+        else
+            migi::AndroidPlatformState().windowValid.store(false);
         break;
 
     default:
@@ -324,7 +328,11 @@ extern "C" void android_main(struct android_app* app)
     migi::SetActiveWindowManager(&windowManager);
     renderThread.Start();
 
-    while (!app->destroyRequested && !renderThread.joined)
+    // Keep pumping the activity event loop for the whole lifetime of the
+    // activity. The engine no longer exits when the window is destroyed (it
+    // pauses and releases its surface via APP_CMD_TERM_WINDOW); it only exits
+    // when the activity is actually destroyed.
+    while (!app->destroyRequested)
         PumpEvents(app);
 
     renderThread.Shutdown();

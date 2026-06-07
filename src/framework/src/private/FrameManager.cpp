@@ -2,6 +2,7 @@
 
 #include <fnd/Assert.h>
 #include <fnd/Job.h>
+#include <fnd/Window.h>
 #include <fw/FrameManager.h>
 
 #include <fnd/Profiler.h>
@@ -22,8 +23,30 @@ FrameManager::FrameManager(IFramePipeline& pipeline)
 
 void FrameManager::Start()
 {
-    StartFrame(FrameUpdateResult());
-    Job::Wait(m_handle);
+    // Outer loop: run frames until the pipeline drains, then decide whether the
+    // drain was a genuine quit (exit) or just the presentation surface going
+    // away (suspend, then wait for it to come back and resume). The first
+    // window is guaranteed valid before MigiMain starts, so the swapchain
+    // created by the Renderer constructor is used for the first run.
+    while (true)
+    {
+        StartFrame(FrameUpdateResult());
+        Job::Wait(m_handle); // returns once frames stop scheduling successors
+
+        // No frame jobs are in flight here, so it is safe to tear the surface
+        // down. Releasing it lets a pending APP_CMD_TERM_WINDOW return.
+        m_pipeline.Suspend();
+        WindowNotifySurfaceReleased();
+
+        if (m_stopRequested.load() || WindowShouldQuit())
+            break;
+
+        WindowWaitUntilValid(); // paused: block until the window comes back
+        if (WindowShouldQuit())
+            break;
+
+        m_pipeline.Resume();
+    }
 }
 
 void FrameManager::SetFrameLatency(int maxFrameLatency) 
@@ -90,7 +113,14 @@ void FrameManager::RunFrame(FrameUpdateResult prevResult) {
         TimePoint updateStart = TimePoint::Now();
         m_pipeline.Update(frameData);
         metricsUs[static_cast<int>(FrameMetric::Update)] = elapsedUs(updateStart);
-        if (!frameData.result.stop) {
+
+        if (frameData.result.stop)
+            m_stopRequested.store(true);
+
+        // Stop scheduling successors when quitting or when the presentation
+        // surface is gone (backgrounded). The in-flight frames drain, letting
+        // FrameManager::Start() suspend or exit cleanly.
+        if (!m_stopRequested.load() && WindowIsValid() && !WindowShouldQuit()) {
             StartFrame(frameData.result);
         }
     }

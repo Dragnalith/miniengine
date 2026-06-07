@@ -28,6 +28,23 @@ struct RendererImpl
         : rhi(drgn::RHI::Create())
         , imguiRenderer(*rhi, manager)
     {
+        CreateSwapChainForCurrentWindow();
+
+        for (uint32_t i = 0; i < NUM_FRAMES_IN_FLIGHT; ++i)
+            frameContext[i].index = i;
+    }
+
+    ~RendererImpl()
+    {
+        rhi->WaitIdle();
+        if (swapChainValid)
+            rhi->DestroySwapChain(swapChain);
+    }
+
+    // (Re)create the swapchain/surface from the platform's current window. Used
+    // at startup and when resuming after the window was destroyed.
+    void CreateSwapChainForCurrentWindow()
+    {
         Int2 windowSize = WindowGetSize();
         width = std::max(windowSize.x, 1);
         height = std::max(windowSize.y, 1);
@@ -39,19 +56,22 @@ struct RendererImpl
         desc.bufferCount = 2;
         desc.fullscreen = fullscreen;
         swapChain = rhi->CreateSwapChain(desc);
-
-        for (uint32_t i = 0; i < NUM_FRAMES_IN_FLIGHT; ++i)
-            frameContext[i].index = i;
+        swapChainValid = true;
     }
 
-    ~RendererImpl()
+    void DestroySwapChainAndSurface()
     {
+        if (!swapChainValid)
+            return;
         rhi->WaitIdle();
         rhi->DestroySwapChain(swapChain);
+        swapChain = {};
+        swapChainValid = false;
     }
 
     std::unique_ptr<drgn::RHI> rhi;
     drgn::SwapChainHandle swapChain;
+    bool swapChainValid = false;
     int width = 0;
     int height = 0;
     bool fullscreen = false;
@@ -177,6 +197,20 @@ void Renderer::Kick(const FrameData& frameData)
 
 void Renderer::Clean(const FrameData&)
 {
+}
+
+void Renderer::Suspend()
+{
+    // The window is gone: drop the swapchain and surface so the platform can
+    // free the native window. The RHI device and all other resources survive.
+    m_impl->DestroySwapChainAndSurface();
+}
+
+void Renderer::Resume()
+{
+    // The window is back (possibly a different size/orientation): build a fresh
+    // surface and swapchain against it.
+    m_impl->CreateSwapChainForCurrentWindow();
 }
 
 }

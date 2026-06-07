@@ -77,4 +77,10 @@ void DefaultFramePipeline::Clean(const FrameData& frameData) {
     m_renderer.Clean(frameData);
     RandomWorkload(1000);
 }
+void DefaultFramePipeline::Suspend() {
+    m_renderer.Suspend();
+}
+void DefaultFramePipeline::Resume() {
+    m_renderer.Resume();
+}
 } // namespace migi

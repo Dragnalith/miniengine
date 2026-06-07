@@ -62,4 +62,24 @@ void* WindowGetNativeHandle()
     return ActiveWindowManager().GetNativeHandle();
 }
 
+bool WindowIsValid()
+{
+    return ActiveWindowManager().IsValid();
+}
+
+bool WindowShouldQuit()
+{
+    return ActiveWindowManager().ShouldQuit();
+}
+
+void WindowWaitUntilValid()
+{
+    ActiveWindowManager().WaitUntilValid();
+}
+
+void WindowNotifySurfaceReleased()
+{
+    ActiveWindowManager().NotifySurfaceReleased();
+}
+
 }

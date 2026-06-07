@@ -22,6 +22,8 @@ public:
     virtual void Render(FrameData& frame);
     virtual void Kick(const FrameData& frameData);
     virtual void Clean(const FrameData& frameData);
+    virtual void Suspend();
+    virtual void Resume();
 
 private:
     DearImGuiManager& m_imguiManager;

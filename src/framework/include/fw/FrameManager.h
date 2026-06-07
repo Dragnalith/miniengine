@@ -8,6 +8,7 @@
 #include <fw/IFramePipeline.h>
 
 #include <stdint.h>
+#include <atomic>
 #include <mutex>
 
 namespace migi
@@ -43,6 +44,10 @@ private:
 
     SpinLock m_frameLatencyLock;
     int64_t m_maxFrameLatency = 0;
+
+    // Set once a frame reports a genuine quit; stops the Start() loop from
+    // resuming after the pipeline drains.
+    std::atomic<bool> m_stopRequested{false};
 
     // Rolling timing history for the pipeline stages and blocking waits.
     // Written at the end of each (concurrent) frame and snapshotted into

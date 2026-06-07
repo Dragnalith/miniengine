@@ -69,4 +69,24 @@ void* WindowManager::GetNativeHandle() const
     return AndroidPlatformState().window;
 }
 
+bool WindowManager::IsValid() const
+{
+    return AndroidPlatformState().windowValid.load();
+}
+
+bool WindowManager::ShouldQuit() const
+{
+    return AndroidPlatformState().windowQuit.load();
+}
+
+void WindowManager::WaitUntilValid()
+{
+    AndroidPlatformState().WaitUntilValidOrQuit();
+}
+
+void WindowManager::NotifySurfaceReleased()
+{
+    AndroidPlatformState().NotifySurfaceReleased();
+}
+
 }

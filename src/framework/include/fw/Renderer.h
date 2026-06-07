@@ -22,6 +22,11 @@ public:
 	void Kick(const FrameData& frameData);
 	void Clean(const FrameData& frameData);
 
+	// Release the swapchain/surface (window gone) and recreate it against the
+	// current window (window back). Used to survive background/resume.
+	void Suspend();
+	void Resume();
+
 private:
 	Pimpl<RendererImpl> m_impl;
 };

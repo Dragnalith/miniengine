@@ -29,6 +29,12 @@ public:
     void SetCursorShape(CursorShape shape);
     void* GetNativeHandle() const;
 
+    // Window/surface lifecycle (see fnd/Window.h for semantics).
+    bool IsValid() const;
+    bool ShouldQuit() const;
+    void WaitUntilValid();
+    void NotifySurfaceReleased();
+
 private:
     Pimpl<WindowManagerImpl> m_impl;
 };

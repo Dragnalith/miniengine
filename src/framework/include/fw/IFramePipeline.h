@@ -22,6 +22,13 @@ public:
                                                        // (CAUTION: do not block worker thread, yield to other job)
 
     virtual void Clean(const FrameData& frameData) = 0; // Run after the frame has been presented
+
+    // Called by the FrameManager when the presentation surface goes away / comes
+    // back (e.g. the app is backgrounded then resumed). Suspend must release any
+    // window-dependent GPU resources (swapchain/surface); Resume recreates them
+    // against the current window. Default no-op for pipelines that don't present.
+    virtual void Suspend() {}
+    virtual void Resume() {}
 };
 
 } // namespace migi

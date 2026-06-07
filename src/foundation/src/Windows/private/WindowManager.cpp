@@ -526,6 +526,27 @@ uint64_t WindowManager::GetLastClosePressEventIndex() const
     return m_impl->GetLastClosePressEventIndex();
 }
 
+// On desktop the Win32 surface persists across minimize/restore, so the window
+// is always "valid", the app only quits through the close-press event, and the
+// surface lifecycle hooks are no-ops.
+bool WindowManager::IsValid() const
+{
+    return true;
+}
+
+bool WindowManager::ShouldQuit() const
+{
+    return false;
+}
+
+void WindowManager::WaitUntilValid()
+{
+}
+
+void WindowManager::NotifySurfaceReleased()
+{
+}
+
 uint32_t WindowManager::GetMouseState(uint64_t lastStateIndex, MouseState* states, uint32_t maxStateCount) const
 {
     return m_impl->GetMouseState(lastStateIndex, states, maxStateCount);
