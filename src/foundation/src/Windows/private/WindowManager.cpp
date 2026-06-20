@@ -236,8 +236,8 @@ struct WindowManagerImpl
     {
         MIGI_ASSERT(hwnd == nullptr, "Only one window is supported");
 
-        const int w = 1280;
-        const int h = 800;
+        const int w = 960;
+        const int h = 1920;
 
         hwnd = ::CreateWindowExA(
             0,
