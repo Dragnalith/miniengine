@@ -5,3 +5,4 @@ user.bazelrc
 .mado
 .android_emulators
 __pycache__
+_tmp

@@ -286,6 +286,24 @@ def app_uid(adb, serial, package):
 LOG_TAG = "miniengine"
 
 
+def device_resolution(adb, serial):
+    # `wm size` prints "Physical size: WxH" and, when a resolution override is
+    # active, an additional "Override size: WxH". The override is the effective
+    # resolution, so prefer it; fall back to physical otherwise.
+    result = run_capture([adb, "-s", serial, "shell", "wm", "size"])
+    if result.returncode != 0:
+        return None
+    physical = None
+    override = None
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        if line.startswith("Physical size:"):
+            physical = line.split(":", 1)[1].strip()
+        elif line.startswith("Override size:"):
+            override = line.split(":", 1)[1].strip()
+    return override or physical
+
+
 def device_time(adb, serial):
     # Local device clock in logcat's threadtime format, used as a lower bound so
     # we only consider log lines produced by this launch.
@@ -358,7 +376,9 @@ def launch_apk(adb, aapt2, apk, serial):
     since = device_time(adb, serial)
     run_quiet([adb, "-s", serial, "shell", "am", "start", "-n", package + "/" + activity])
     print("%s has been launched successfully." % package)
-    print("device: %s" % serial)
+    print("device serial: %s" % serial)
+    resolution = device_resolution(adb, serial)
+    print("device resolution: %s" % (resolution or "<unknown>"))
 
     uid = app_uid(adb, serial, package)
     print("uid: %s" % (uid or "<unknown>"))
