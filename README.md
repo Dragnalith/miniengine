@@ -14,6 +14,8 @@ Basic controls:
 
 ## Build
 
+There is nothing to install. Every dependency, toolchain, and SDK (MSVC, the Windows SDK, the Android SDK/NDK, etc.) is managed and fetched automatically by Bazel — you only need Bazel itself.
+
 `//src/app` dispatches by platform; onec Windows the graphics API is `--//build/config:gpuapi` (`DX12` default, or `Vulkan`). On Android the graphics API is always `Vulkan`.
 
 ```shell
