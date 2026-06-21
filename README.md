@@ -43,6 +43,8 @@ bazel run //src/app --platforms=//:android -- --emulator   # force emulator
 
 `//tools:control_target` drives the connected target (physical device preferred, else emulator) to take screenshots and replay input. Output paths are relative to where you run the command, and existing files are overwritten.
 
+Input coordinates are in device pixels, matching the resolution printed at launch by `bazel run //src/app --platforms=//:android` (e.g. `device resolution: 1080x2410`). Screenshots are not always captured at the display resolution, so always scale any coordinates read off a screenshot back to the device resolution before using them.
+
 ```shell
 bazel run //tools:control_target -- screenshot out.png
 bazel run //tools:control_target -- input "TAP 40,570; WAIT 200; TAP 100,150; SCREENSHOT out.png"
