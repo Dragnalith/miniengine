@@ -2,8 +2,8 @@ load("//tools:control_tool.bzl", "control_tool")
 
 package(default_visibility = ["//visibility:public"])
 
-exports_files(["control_target.py.tpl"])
+exports_files(["control_device.py.tpl"])
 
-# bazel run //tools:control_target -- screenshot out.png
-# bazel run //tools:control_target -- input "TAP 40,570; WAIT 200; SCREENSHOT out.png"
-control_tool(name = "control_target")
+# bazel run //tools:control_device -- screenshot out.png
+# bazel run //tools:control_device -- input "TAP 40,570; WAIT 200; SCREENSHOT out.png"
+control_tool(name = "control_device")

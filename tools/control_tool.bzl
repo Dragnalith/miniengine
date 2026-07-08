@@ -1,9 +1,9 @@
 """`control_tool` rule.
 
-Generates an executable that drives a connected Android target through `adb`
+Generates an executable that drives a connected Android device through `adb`
 (screenshots and input/gesture streams). Built on the same hermetic-Python
 launcher + runfiles staging as the //build/rules/android runners, so
-`bazel run //tools:control_target -- <args>` works with no system SDK on PATH.
+`bazel run //tools:control_device -- <args>` works with no system SDK on PATH.
 """
 
 load("//build/rules/android/private:runner_common.bzl", "rlocation_path", "write_python_launcher")
@@ -53,7 +53,7 @@ control_tool = rule(
     attrs = {
         "_runner_template": attr.label(
             allow_single_file = True,
-            default = "//tools:control_target.py.tpl",
+            default = "//tools:control_device.py.tpl",
         ),
         "_adb": attr.label(
             allow_single_file = True,

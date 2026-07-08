@@ -18,8 +18,8 @@ Make the smallest change that fully satisfies the task while staying consistent 
 
 Code review alone does not finish a task. An app task is complete only after you have built, run, and exercised the app to confirm the new behavior — always do this unless the user explicitly tells you not to test. Test on Android by default (`--platforms=//:android`); only target Windows when the task is Windows-specific or the user asks.
 
-1. Build and run in one step with `bazel run //src/app --platforms=//:android`.
-2. Drive the running app with `bazel run //tools:control_target` — replay input and capture screenshots, then inspect those screenshots to confirm the behavior your task targeted.
+1. Build and run in one step with `bazel run //src:game --platforms=//:android`.
+2. Drive the running app with `bazel run //tools:control_device` — replay input and capture screenshots, then inspect those screenshots to confirm the behavior your task targeted.
 
 Write any files produced for debugging (screenshots, logs, scratch output) into the `_tmp/` folder — it is gitignored, so these artifacts stay out of the repository.
 

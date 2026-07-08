@@ -1,10 +1,10 @@
-"""Generated runner for //tools:control_target.
+"""Generated runner for //tools:control_device.
 
-Drives a connected Android target through `adb`:
+Drives a connected Android device through `adb`:
 
-    bazel run //tools:control_target -- screenshot out.png
-    bazel run //tools:control_target -- input "TAP 40,570; WAIT 200; TAP 100,150; SCREENSHOT out.png"
-    bazel run //tools:control_target -- input --file gestures.txt
+    bazel run //tools:control_device -- screenshot out.png
+    bazel run //tools:control_device -- input "TAP 40,570; WAIT 200; TAP 100,150; SCREENSHOT out.png"
+    bazel run //tools:control_device -- input --file gestures.txt
 
 The `input` stream is a list of `;`-separated commands:
 
@@ -218,14 +218,14 @@ def run_input_stream(adb, serial, stream):
 
 def main():
     parser = argparse.ArgumentParser(
-        prog="bazel run //tools:control_target --",
-        description="Screenshot and input automation for a connected Android target.",
+        prog="bazel run //tools:control_device --",
+        description="Screenshot and input automation for a connected Android device.",
     )
     parser.add_argument(
         "-s",
         "--serial",
         default=None,
-        help="adb serial to target. Defaults to the connected device (physical preferred).",
+        help="adb serial for the device. Defaults to the connected device (physical preferred).",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
