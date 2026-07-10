@@ -53,7 +53,7 @@ java_repository.remote(
         "@platforms//os:windows",
         "@platforms//cpu:x86_64",
     ],
-    urls = ["https://aka.ms/download-jdk/microsoft-jdk-21-windows-x64.zip"],
+    urls = ["https://aka.ms/download-jdk/microsoft-jdk-21.0.10-windows-x64.zip"],
     version = "21",
 )
 use_repo(
