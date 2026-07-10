@@ -1,6 +1,14 @@
 # Mini Engine
 
-Mini Game Engine reproduce the structure of a professional game engine in order to demonstrate architecture and infrastructure topics.
+## Purpose
+
+Mini Engine is a small but complete game project mimicking the complexity of a real game architecture: multi-platform (Windows, Android), multi graphics API (DirectX, Vulkan), a layer division between platform abstraction, engine, and application, and offline shader compilation as part of the build.
+
+The project exists as a demonstration of how to build such a project with Bazel. It is hermetic: every dependency (WinSDK, MSVC, Android SDK, Python, Java) is downloaded on demand if required.
+
+To know more about the hermetic toolchain that downloads the WinSDK and MSVC from Microsoft's servers, have a look at [`toolchains_msvc`](https://github.com/Dragnalith/toolchains_msvc).
+
+Mini Engine is also the companion example for the CEDEC 2026 talk *Build System in the Autonomous Agents Era* — if you came from the talk, this is the project to try.
 
 ## The game
 
