@@ -267,7 +267,7 @@ void Game::Update(migi::FrameData& frameData)
                 break;
             }
             case Phase::Won:
-                NewGame();
+                // The board stays in the won state; only the New Game button resets.
                 break;
             }
         }
@@ -319,6 +319,23 @@ void Game::Update(migi::FrameData& frameData)
             if (m_matched[i])
                 dl->AddRect(mn, mx, IM_COL32(46, 204, 113, 255), rounding, 0, card * 0.04f);
         }
+    }
+
+    // Win banner: large text on a flat black panel over the board, kept
+    // visible until New Game is pressed.
+    if (m_phase == Phase::Won)
+    {
+        const char* winText = "You win";
+        const float winFont = screenH * 0.08f;
+        const ImVec2 textSize = ImGui::GetFont()->CalcTextSizeA(winFont, FLT_MAX, 0.0f, winText);
+        const float padX = winFont * 0.5f;
+        const float padY = winFont * 0.3f;
+        const ImVec2 center(screenW * 0.5f, gridTop + gridH * 0.5f);
+        dl->AddRectFilled(ImVec2(center.x - textSize.x * 0.5f - padX, center.y - textSize.y * 0.5f - padY),
+                          ImVec2(center.x + textSize.x * 0.5f + padX, center.y + textSize.y * 0.5f + padY),
+                          IM_COL32(0, 0, 0, 255), winFont * 0.25f);
+        DrawCenteredText(dl, center.x, center.y - textSize.y * 0.5f,
+                         winFont, IM_COL32(241, 196, 15, 255), winText);
     }
 
     // New Game button.
