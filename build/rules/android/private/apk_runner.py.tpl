@@ -409,7 +409,7 @@ def stream_log(adb, serial):
 def main():
     adb = rlocation(ADB_RLOCATION)
     aapt2 = rlocation(AAPT2_RLOCATION)
-    apk = rlocation(APK_RLOCATION)
+    apk = os.path.realpath(rlocation(APK_RLOCATION))
 
     command, selector_kind, identifier = parse_selector(sys.argv[1:])
     if command == "list":
