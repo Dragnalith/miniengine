@@ -20,6 +20,10 @@ Basic controls:
 - With two cards selected, tap to validate: if they match, the pair stays revealed.
 - If they do not match, tap to flip both cards back face down, then try again.
 
+## Install Bazel
+
+If `bazel` is not available in your `PATH`, run `install_bazel.bat` to downloads a `bazel.exe` at the root of the repository. (note it installs [Bazelisk](https://github.com/bazelbuild/bazelisk) renamed as `bazel.exe`)
+
 ## Build
 
 There is nothing to install. Every dependency, toolchain, and SDK (MSVC, the Windows SDK, the Android SDK/NDK, etc.) is managed and fetched automatically by Bazel — you only need Bazel itself.
